@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ "**" ]
+  schedule:
+    # GitHub deletes caches after not being used for 7 days. An uncached build
+    # takes about 30x longer than one with caches. Hence: make sure that caches
+    # for the main branch never fall out of LRU.
+    - cron: '0 0 */6 * *'
+
+env:
+  APPIMAGE_BUNDLER: github:ralismark/nix-appimage?rev=17dd6001ec228ea0b8505d6904fc5796d3de5012
+
+permissions:
+  contents: read
+
+jobs:
+  nix-build:
+    name: Build with Nix
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        # Backing architectures based on information from
+        # https://github.com/actions/runner-images/
+        #
+        # ubuntu-22.04 - amd64
+        # macos-14-large - amd64
+        # macos-14-xlarge - arm64
+        os: [ ubuntu-22.04, macos-14-large, macos-14-xlarge ]
+
+    steps:
+      - name: Get token
+        id: get_token
+        uses: tibdex/github-app-token@3beb63f4bd073e61482598c45c71c1019b59b73a # v2.1.0
+        with:
+          app_id: ${{ secrets.ELASTIC_OBSERVABILITY_APP_ID }}
+          private_key: ${{ secrets.ELASTIC_OBSERVABILITY_APP_PEM }}
+          permissions: >-
+            {
+              "contents": "read"
+            }
+          repositories: >-
+            ["devfiler"]
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ steps.get_token.outputs.token }}
+          submodules: true
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@17fe5fb4a23ad6cbbe47d6b3f359611ad276644c # v31
+        with:
+          install_url: https://releases.nixos.org/nix/nix-2.16.2/install
+
+      - name: Execute checks
+        run: nix flake check -L '.?submodules=1#'
+      - name: Build
+        # Use 8 jobs to force more concurrency with crate download jobs.
+        run: nix build -L -j8 '.?submodules=1#'
+
+      # Linux only
+      - name: Build AppImage (Linux x86_64 only)
+        if: runner.os == 'Linux'
+        run: nix bundle --system x86_64-linux --inputs-from . --bundler $APPIMAGE_BUNDLER -L '.?submodules=1#appImageWrapper'
+
+      # macOS only
+      - name: Build application bundle (macOS only)
+        if: runner.os == 'macOS'
+        run: nix build -L '.?submodules=1#macAppZip'

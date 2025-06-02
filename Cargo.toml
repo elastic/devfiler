@@ -1,0 +1,82 @@
+[package]
+name = "devfiler"
+version = "0.14.0"
+edition = "2021"
+license = "Apache-2.0"
+
+[profile.dev]
+opt-level = 1
+
+[profile.release]
+opt-level = 3
+panic = "abort"
+debug = 1
+
+[profile.release-lto]
+inherits = "release"
+lto = "thin"
+codegen-units = 1
+strip = true
+
+[features]
+default = ["render-opengl", "automagic-symbols", "allow-dev-mode"]
+
+# Enable the OpenGL renderer backend.
+render-opengl = ["eframe/glow"]
+# Enable the WebGPU (Metal, Vulkan) renderer backend.
+render-wgpu = ["eframe/wgpu"]
+# Enable automagic symbolization from global indexing infra.
+automagic-symbols = []
+# Allow entering UP developer mode by double-clicking the logo.
+allow-dev-mode = []
+# Enable UP developer mode by default.
+default-dev-mode = ["allow-dev-mode"]
+
+[dependencies]
+symblib = { version = "*", path = "./opentelemetry-ebpf-profiler/rust-crates/symblib" }
+anyhow = "1.0.71"
+smallvec = "1.11.1"
+arc-swap = "1.6.0"
+base64 = "0.21.7"
+egui = "0.26.1"
+egui_plot = "0.26.1"
+egui_extras = { version = "0.26.1", features = ["image"] }
+egui_commonmark = "0.12.0"
+egui-phosphor = "0.4.0"
+fallible-iterator = "0.3.0"
+chrono = "0.4.31"
+indexmap = "2.1.0"
+itertools = "0.12.0"
+lazy_static = "1.4.0"
+home = "0.5"
+prost = "0.12.1"
+reqwest = { version = "0.11.22", features = ["json"] }
+rand = "0.8.5"
+rkyv = { version = "0.7.42", features = ["strict"] }
+serde = { version = "1.0.193", features = ["derive"] }
+serde_json = "1.0.108"
+tikv-jemallocator = "0.5.4"
+tokio = { version = "1.32.0", features = ["macros", "rt-multi-thread"] }
+tonic = { version = "0.11.0", features = ["gzip"] }
+tracing = "0.1.37"
+tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
+zstd = "0.13.0"
+lru = "0.12.1"
+nohash-hasher = "0.2.0"
+memmap2 = "0.9.4"
+xxhash-rust = { version = "0.8.10", features = ["xxh3"] }
+hashbrown = "0.15.2"
+idna = "1.0.3"
+
+[dependencies.rocksdb]
+version = "0.22.0"
+default-features = false
+features = ["zstd", "jemalloc"]
+
+[dependencies.eframe]
+version = "0.26.1"
+default-features = false
+features = ["default_fonts", "x11"]
+
+[build-dependencies]
+tonic-build = "0.11.0"
