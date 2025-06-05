@@ -796,7 +796,7 @@ version = "0.14.0"
 dependencies = [
  "anyhow",
  "arc-swap",
- "base64 0.21.7",
+ "base64 0.22.1",
  "chrono",
  "eframe",
  "egui",
