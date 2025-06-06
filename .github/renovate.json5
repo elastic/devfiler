@@ -1,0 +1,24 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:best-practices",
+    "helpers:pinGitHubActionDigestsToSemver"
+  ],
+  "packageRules": [
+    {
+      "groupName": "GitHub Actions",
+      "matchManagers": ["github-actions"],
+      "schedule": ["before 8am every weekday"],
+      "automerge": true
+    },
+    {
+      "groupName": "Rust dependencies",
+      "matchManagers": ["cargo"],
+      "schedule": ["before 8am every weekday"],
+      "automerge": true
+    }
+  ],
+  "labels": [
+    "dependencies"
+  ]
+}
