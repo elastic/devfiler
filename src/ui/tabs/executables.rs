@@ -108,19 +108,48 @@ impl ExecutablesTab {
 
         ui.separator();
         let bar_size = Vec2::new(ui.available_width(), 20.0);
-        let bar_rect = Rect::from_min_size(ui.next_widget_position(), bar_size);
-        ui.allocate_ui_at_rect(bar_rect, |ui| {
-            ui.columns(3, |ui| {
-                ui[0].with_layout(Layout::left_to_right(Align::Center), |ui| {
-                    ui.label(format!("{} executables", self.last_exe_count));
-                });
-                ui[1].with_layout(Layout::centered_and_justified(Direction::TopDown), |ui| {
-                    ui.label(ingest_status);
-                });
-                ui[2].with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    let hint = format!("{} Filter ...", icons::FUNNEL);
-                    clearable_line_edit(ui, &hint, &mut self.filter);
-                });
+
+        // Allocate space for the entire bar
+        let (_rect, _) = ui.allocate_space(bar_size);
+
+        // Create the horizontal layout directly inside the main UI
+        ui.horizontal(|ui| {
+            // Set the width of each column
+            let available_width = ui.available_width();
+            let col_width = available_width / 3.0;
+
+            // First column - left aligned
+            ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                ui.allocate_ui_with_layout(
+                    Vec2::new(col_width, bar_size.y),
+                    Layout::left_to_right(Align::Center),
+                    |ui| {
+                        ui.label(format!("{} executables", self.last_exe_count));
+                    },
+                );
+            });
+
+            // Second column - centered
+            ui.with_layout(Layout::centered_and_justified(Direction::TopDown), |ui| {
+                ui.allocate_ui_with_layout(
+                    Vec2::new(col_width, bar_size.y),
+                    Layout::centered_and_justified(Direction::TopDown),
+                    |ui| {
+                        ui.label(ingest_status);
+                    },
+                );
+            });
+
+            // Third column - right aligned
+            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                ui.allocate_ui_with_layout(
+                    Vec2::new(col_width, bar_size.y),
+                    Layout::right_to_left(Align::Center),
+                    |ui| {
+                        let hint = format!("{} Filter ...", icons::FUNNEL);
+                        clearable_line_edit(ui, &hint, &mut self.filter);
+                    },
+                );
             });
         });
 
@@ -169,9 +198,15 @@ impl ExecutablesTab {
             painter.rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, Color32::BLACK));
 
             if matches!(response.hover_pos(), Some(p) if rect.contains(p)) {
-                show_tooltip_at_pointer(ui.ctx(), Id::new("executable-bar-tooltip"), |ui| {
-                    ui.label(format!("{}: {:.0}", name, humanize_count(value)));
-                });
+                let tooltip_id = Id::new("executable-bar-tooltip");
+                show_tooltip_at_pointer(
+                    ui.ctx(),
+                    egui::LayerId::new(egui::Order::Tooltip, tooltip_id),
+                    tooltip_id,
+                    |ui: &mut Ui| {
+                        ui.label(format!("{}: {:.0}", name, humanize_count(value)));
+                    },
+                );
             }
 
             offset += width;

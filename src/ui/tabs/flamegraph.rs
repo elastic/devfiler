@@ -243,7 +243,12 @@ impl FlameGraphWidget {
         if let Some(hover_pos) = cursor_hover_pos {
             if screen_rect.contains(hover_pos) {
                 let id = Id::new("flamegraph-tooltip");
-                show_tooltip_at_pointer(ctx, id, |ui| self.draw_tooltip(ui, cfg, root, flame));
+                show_tooltip_at_pointer(
+                    ctx,
+                    egui::LayerId::new(egui::Order::Tooltip, id),
+                    id,
+                    |ui: &mut Ui| self.draw_tooltip(ui, cfg, root, flame),
+                );
 
                 if clicked && flame.weight >= 1 {
                     self.x_zoom = root.weight as f32 / flame.weight as f32;
@@ -315,7 +320,7 @@ impl FlameGraphWidget {
             });
             ui.horizontal(|ui| {
                 ui.strong("Location:");
-                ui.add(Label::new(&flame.text).wrap(true));
+                ui.add(Label::new(&flame.text).wrap());
             });
         });
     }

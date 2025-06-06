@@ -150,7 +150,7 @@ impl DevfilerUi {
         static ADD_DATA_MD: &str = include_str!("./add-data.md");
 
         egui::ScrollArea::vertical().show(ui, |ui| {
-            CommonMarkViewer::new("add-data-viewer").show(ui, &mut self.md_cache, ADD_DATA_MD);
+            CommonMarkViewer::new().show(ui, &mut self.md_cache, ADD_DATA_MD);
         });
     }
 
@@ -158,7 +158,7 @@ impl DevfilerUi {
         let plot = Plot::new("trace_counts")
             .custom_x_axes(vec![timeaxis::mk_time_axis(Axis::X)])
             .custom_y_axes(vec![AxisHints::new_y().label("Samples")])
-            .y_axis_width(2)
+            .y_axis_min_width(2.0)
             .x_grid_spacer(timeaxis::mk_time_grid)
             .allow_drag([true, false])
             .height(100.0)

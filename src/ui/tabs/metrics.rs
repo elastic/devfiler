@@ -81,7 +81,7 @@ impl TabWidget for MetricsTab {
         Plot::new("metrics")
             .custom_x_axes(vec![timeaxis::mk_time_axis(Axis::X)])
             .custom_y_axes(vec![AxisHints::new_y().label("Value")])
-            .y_axis_width(5)
+            .y_axis_min_width(5.0)
             .x_grid_spacer(timeaxis::mk_time_grid)
             .legend(Legend::default())
             .label_formatter(|name, val| {

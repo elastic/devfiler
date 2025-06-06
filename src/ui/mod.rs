@@ -55,7 +55,7 @@ pub fn gui_thread(collector: crate::collector::Collector) -> Result<(), eframe::
             egui_extras::install_image_loaders(&cc.egui_ctx);
             load_phosphor_icons(&cc.egui_ctx);
             tokio::spawn(background_ui_waker(cc.egui_ctx.clone()));
-            Box::new(app::DevfilerUi::new(collector))
+            Ok(Box::new(app::DevfilerUi::new(collector)))
         }),
     )
 }
