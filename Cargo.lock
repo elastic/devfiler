@@ -811,7 +811,7 @@ dependencies = [
  "indexmap 2.6.0",
  "itertools 0.14.0",
  "lazy_static",
- "lru",
+ "lru 0.14.0",
  "memmap2",
  "nohash-hasher",
  "prost",
@@ -2078,6 +2078,12 @@ name = "lru"
 version = "0.12.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "234cf4f4a04dc1f57e24b96cc0cd600cf2af460d4161ac5ecdd0af8e1f3b2a38"
+
+[[package]]
+name = "lru"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9f8cc7106155f10bdf99a6f379688f543ad6596a415375b36a59a054ceda1198"
 dependencies = [
  "hashbrown 0.15.2",
 ]
@@ -3330,7 +3336,7 @@ dependencies = [
  "flate2",
  "gimli 0.30.0",
  "intervaltree",
- "lru",
+ "lru 0.12.5",
  "memmap2",
  "object",
  "prost",
