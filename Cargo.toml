@@ -74,7 +74,7 @@ default-features = false
 features = ["zstd", "jemalloc"]
 
 [dependencies.eframe]
-version = "0.26.1"
+version = "0.31.0"
 default-features = false
 features = ["default_fonts", "x11"]
 
