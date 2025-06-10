@@ -127,26 +127,6 @@ unveil them with a double click on the "devfiler" text in the top left.
 
 ## Releases
 
-<details>
-<summary>Creating release artifacts locally</summary>
-
-Update `version` in `Cargo.toml` for the package to the appropriate release version number
-
-```
-# On a linux machine, architecture doesn't matter as long as qemu binfmt is installed:
-nix bundle --system aarch64-linux --inputs-from . --bundler 'github:ralismark/nix-appimage' '.?submodules=1#appImageWrapper' -L
-nix bundle --system x86_64-linux  --inputs-from . --bundler 'github:ralismark/nix-appimage' '.?submodules=1#appImageWrapper' -L
-# Resulting appimages are symlinked into CWD.
-
-# On a ARM64 mac w/ Rosetta installed:
-nix build -L '.?submodules=1#packages.aarch64-darwin.macAppZip' -j20
-cp result/devfiler.zip devfiler-apple-silicon-mac.zip
-nix build -L '.?submodules=1#packages.x86_64-darwin.macAppZip' -j20
-cp result/devfiler.zip devfiler-intel-mac.zip
-```
-
-</details>
-
 > [!NOTE]
 >
 > Binary releases are covered by multiple licenses (stemming from compiling and
