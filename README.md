@@ -81,7 +81,7 @@ be available in the repositories of other distributions and also from MacPorts/B
 names may vary.
 
 ```
-sudo apt install g++ libclang-dev protobuf-compiler libprotobuf-dev
+sudo apt install g++ libclang-dev protobuf-compiler libprotobuf-dev cmake
 ```
 
 devfiler can then be built using:
