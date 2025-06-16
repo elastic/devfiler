@@ -290,10 +290,14 @@ fn process_sample(
     let mut frame_list = Vec::with_capacity(loc_rng.len().min(128));
     for loc_index in loc_rng {
         let Some(location_table_idx) = profile_location_indices.get(loc_index as usize) else {
-            return Err(Status::invalid_argument(format!("(1) location index is out of bounds {}", loc_index)));
+            return Err(Status::invalid_argument(
+                "location_indices: index is out of bounds",
+            ));
         };
         let Some(frame) = loc_mapping.get(*location_table_idx as usize) else {
-            return Err(Status::invalid_argument("location index is out of bounds"));
+            return Err(Status::invalid_argument(
+                "location_table: index is out of bounds",
+            ));
         };
         frame_list.push(*frame);
     }
