@@ -70,7 +70,7 @@ impl pb_collector::profiles_service_server::ProfilesService for ProfilesService 
 
                     let st = &profile.sample_type[0];
                     for sample in &profile.sample {
-                        process_sample(dict, &loc_mapping, &st, sample)?;
+                        process_sample(dict, &loc_mapping, &st, sample, &profile.location_indices)?;
                     }
                 }
             }
@@ -280,6 +280,7 @@ fn process_sample(
     loc_mapping: &Vec<Frame>,
     sample_type: &ValueType,
     sample: &Sample,
+    profile_location_indices: &Vec<i32>,
 ) -> Result<(), Status> {
     let loc_start = sample.locations_start_index as usize;
     let loc_len = sample.locations_length as usize;
@@ -288,7 +289,10 @@ fn process_sample(
     // Collect frame list.
     let mut frame_list = Vec::with_capacity(loc_rng.len().min(128));
     for loc_index in loc_rng {
-        let Some(frame) = loc_mapping.get(loc_index as usize) else {
+        let Some(location_table_idx) = profile_location_indices.get(loc_index as usize) else {
+            return Err(Status::invalid_argument(format!("(1) location index is out of bounds {}", loc_index)));
+        };
+        let Some(frame) = loc_mapping.get(*location_table_idx as usize) else {
             return Err(Status::invalid_argument("location index is out of bounds"));
         };
         frame_list.push(*frame);
