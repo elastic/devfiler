@@ -405,15 +405,23 @@ mod tests {
 
         assert_eq!(
             collect_frame_list(0, 2, &loc_mapping, &location_indices)?,
-            vec![4, 9]
+            vec![4, 9],
+            "location_indices: {{0,1}}"
         );
         assert_eq!(
             collect_frame_list(1, 0, &loc_mapping, &location_indices)?,
-            Vec::<i32>::new()
+            Vec::<i32>::new(),
+            "zero-length trace"
         );
         assert_eq!(
             collect_frame_list(0, location_indices.len(), &loc_mapping, &location_indices)?,
-            location_indices
+            location_indices,
+            "trace takes all indices in location_indices"
+        );
+        assert_eq!(
+            collect_frame_list(2, 0, &loc_mapping, &vec![0i32, 1i32])?,
+            Vec::<i32>::new(),
+            "zero-length trace with loc_start out-of-bounds"
         );
 
         Ok(())
@@ -423,16 +431,28 @@ mod tests {
     fn sample_frame_list_err() -> Result<(), Status> {
         let loc_mapping = (0..11).collect_vec();
 
-        let loc_indices_oob = collect_frame_list(0, 3, &loc_mapping, &vec![0i32, 1i32]);
         assert_eq!(
-            loc_indices_oob.unwrap_err().message(),
-            "location_indices: index is out of bounds"
+            collect_frame_list(0, 3, &loc_mapping, &vec![0i32, 1i32])
+                .unwrap_err()
+                .message(),
+            "location_indices: index is out of bounds",
+            "sample trace size: 3, len(location_indices): 2"
         );
 
-        let loc_table_oob = collect_frame_list(0, 2, &loc_mapping, &vec![1i32, 13i32]);
         assert_eq!(
-            loc_table_oob.unwrap_err().message(),
-            "location_table: index is out of bounds"
+            collect_frame_list(1, 2, &loc_mapping, &vec![0i32, 1i32])
+                .unwrap_err()
+                .message(),
+            "location_indices: index is out of bounds",
+            "sample trace index start: 1, sample trace length: 2, len(location_indices): 2"
+        );
+
+        assert_eq!(
+            collect_frame_list(0, 2, &loc_mapping, &vec![1i32, 13i32])
+                .unwrap_err()
+                .message(),
+            "location_table: index is out of bounds",
+            "trace location indices: {{1,13}}, len(location_table): 2"
         );
 
         Ok(())
