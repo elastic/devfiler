@@ -22,9 +22,9 @@ machine, but the UI can be used on macOS.
 
 [@athre0z]: https://github.com/athre0z
 
-<img width="1804" alt="screenshot1" src="https://github.com/elastic/devfiler/assets/6553158/8bafe702-147f-45d9-b554-39e4fbc87813">
+<img width="1804" alt="screenshot1" src="https://github.com/elastic/devfiler/blob/e8d68d9176f39eea8b05293059a2baecff02aaee/assets/screenshot1.png">
 
-<img width="1804" alt="screenshot2" src="https://github.com/elastic/devfiler/assets/6553158/a12f216b-40fb-4fb2-b3ee-286dff26a266">
+<img width="1804" alt="screenshot2" src="https://github.com/elastic/devfiler/blob/e8d68d9176f39eea8b05293059a2baecff02aaee/assets/screenshot2.png">
 
 ## Build
 
@@ -81,7 +81,7 @@ be available in the repositories of other distributions and also from MacPorts/B
 names may vary.
 
 ```
-sudo apt install g++ libclang-dev protobuf-compiler libprotobuf-dev
+sudo apt install g++ libclang-dev protobuf-compiler libprotobuf-dev cmake
 ```
 
 devfiler can then be built using:

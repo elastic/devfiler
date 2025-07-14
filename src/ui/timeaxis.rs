@@ -67,8 +67,8 @@ pub fn mk_time_grid(input: GridInput) -> Vec<GridMark> {
     marks
 }
 
-pub fn mk_time_axis(axis: Axis) -> AxisHints {
-    AxisHints::new(axis).formatter(|x, _, _| {
+pub fn mk_time_axis(axis: Axis) -> AxisHints<'static> {
+    AxisHints::new(axis).formatter(|x, _| {
         let t = ts2chrono(x.value as i64);
 
         let has_seconds = t.second() != 0;

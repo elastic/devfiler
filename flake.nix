@@ -79,6 +79,7 @@
           linuxDynamicLibs = lib.makeLibraryPath (with pkgs; with xorg; [
             libGL
             libX11
+            libxkbcommon
             libXcursor
             libXrandr
             libXi
