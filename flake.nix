@@ -284,12 +284,6 @@
             patchelf --shrink-rpath $out/bin/devfiler
           '';
 
-          # Wrapped variant of devfiler that uses the Distro's libgl.
-          devfilerDistroGL = pkgs.writeShellScriptBin "devfiler-distro-gl" ''
-            export LD_LIBRARY_PATH=${lib.concatStringsSep ":" appImageLibDirs}
-            ${lib.getExe appImageDevfiler} "$@"
-          '';
-
           # AppImage wrapper with the correct name for the final artifact
           appImageWrapper = pkgs.writeShellScriptBin "devfiler-appimage" ''
             export LD_LIBRARY_PATH=${lib.concatStringsSep ":" appImageLibDirs}
@@ -316,7 +310,7 @@
           } // lib.optionalAttrs isDarwin {
             inherit macAppZip;
           } // lib.optionalAttrs isLinux {
-            inherit appImageWrapper devfilerDistroGL appImageDevfiler;
+            inherit appImageWrapper appImageDevfiler;
           };
           checks.rustfmt = devfilerCheckRustfmt;
         }
