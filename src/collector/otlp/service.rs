@@ -160,6 +160,7 @@ fn get_attr<'tab>(
 fn ingest_locations(dic: &ProfilesDictionary) -> Result<Vec<Frame>, Status> {
     let stab = &dic.string_table;
     let atab = &dic.attribute_table;
+    let ftab = &dic.function_table;
     let locs = &dic.location_table;
     let mut batch = DB.stack_frames.batched_insert();
     let mut mappings = Vec::with_capacity(locs.len());
@@ -203,21 +204,54 @@ fn ingest_locations(dic: &ProfilesDictionary) -> Result<Vec<Frame>, Status> {
             return Err(Status::invalid_argument("mapping index is out of bounds"));
         };
 
-        let build_id = get_attr(
-            atab,
-            mapping.attribute_indices.to_vec(),
-            "process.executable.build_id.htlhash", // OTel Profiling specific build ID.
-        )
-        .or_else(|_| {
-            get_attr(
+        let build_id;
+        let generated_build_id;
+        let build_id_str = if !mapping.attribute_indices.is_empty() {
+            build_id = get_attr(
                 atab,
                 mapping.attribute_indices.to_vec(),
-                "process.executable.build_id.profiling", // Legacy OTel Profiling specific build ID.
+                "process.executable.build_id.htlhash", // OTel Profiling specific build ID.
             )
-        })?;
+            .or_else(|_| {
+                get_attr(
+                    atab,
+                    mapping.attribute_indices.to_vec(),
+                    "process.executable.build_id.profiling", // Legacy OTel Profiling specific build ID.
+                )
+            })?;
+            build_id
+        } else {
+            // Fallback option: Generate xxh3 hash over all fields of all loc.line elements
+            // if there is no build_id attribute.
+            let mut hasher = xxh3::Xxh3::new();
+            for line in &loc.line {
+                if line.function_index != 0 {
+                    if let Some(fn_ref) = ftab.get(line.function_index as usize) {
+                        // Hash function name if available
+                        if let Ok(Some(function_name)) =
+                            get_str_opt(stab, fn_ref.name_strindex as usize, "function name")
+                        {
+                            hasher.update(function_name.as_bytes());
+                        }
+                        // Hash function filename if available
+                        if let Ok(Some(file_name)) = get_str_opt(
+                            stab,
+                            fn_ref.filename_strindex as usize,
+                            "function filename",
+                        ) {
+                            hasher.update(file_name.as_bytes());
+                        }
+                    }
+                }
+                hasher.update(&line.line.to_le_bytes());
+                hasher.update(&line.column.to_le_bytes());
+            }
+            generated_build_id = format!("{:016x}", hasher.digest());
+            &generated_build_id
+        };
 
         let Some(file_id) =
-            FileId::try_parse_es(build_id).or_else(|| FileId::try_parse_hex(build_id))
+            FileId::try_parse_es(build_id_str).or_else(|| FileId::try_parse_hex(build_id_str))
         else {
             return Err(Status::invalid_argument("failed to parse file ID"));
         };
