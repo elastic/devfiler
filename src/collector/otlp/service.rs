@@ -242,9 +242,6 @@ fn ingest_locations(dic: &ProfilesDictionary) -> Result<Vec<Frame>, Status> {
                             hasher.update(file_name.as_bytes());
                         }
                     }
-                } else {
-                    // If function_index is 0, hash the index itself as fallback.
-                    hasher.update(&line.function_index.to_le_bytes());
                 }
                 hasher.update(&line.line.to_le_bytes());
                 hasher.update(&line.column.to_le_bytes());
