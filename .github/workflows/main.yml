@@ -55,7 +55,7 @@ jobs:
       - name: Install Nix
         uses: cachix/install-nix-action@c134e4c9e34bac6cab09cf239815f9339aaaf84e # v31
         with:
-          install_url: https://releases.nixos.org/nix/nix-2.16.2/install
+          install_url: https://releases.nixos.org/nix/nix-2.24.10/install
 
       - name: Execute checks
         run: nix flake check -L '.?submodules=1#'

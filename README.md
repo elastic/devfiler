@@ -50,12 +50,6 @@ Alternatively you can simply ask Nix to both build and run it for you:
 nix --experimental-features 'flakes nix-command' run '.?submodules=1#'
 ```
 
-If you are on Linux and run into OpenGL (glutin) errors, try the following instead:
-
-```
-nix --experimental-features 'flakes nix-command' run '.?submodules=1#devfilerDistroGL'
-```
-
 [Nix]: https://nixos.org/download
 
 The need to always pass the `--experimental-features` argument can be circumvented by putting
