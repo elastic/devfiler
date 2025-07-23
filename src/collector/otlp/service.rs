@@ -370,6 +370,7 @@ fn process_sample(
         let kind = match (sample_type_type, sample_type_unit) {
             ("samples", "count") => SampleKind::OnCPU,
             ("events", "nanoseconds") => SampleKind::OffCPU,
+            ("events", "count") => SampleKind::UProbe,
             _ => SampleKind::Unknown,
         };
 

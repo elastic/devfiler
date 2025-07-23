@@ -268,6 +268,7 @@ impl DevfilerUi {
                     ui.selectable_value(&mut self.kind, SampleKind::Mixed, "Mixed");
                     ui.selectable_value(&mut self.kind, SampleKind::OnCPU, "On CPU");
                     ui.selectable_value(&mut self.kind, SampleKind::OffCPU, "Off CPU");
+                    ui.selectable_value(&mut self.kind, SampleKind::UProbe, "UProbe");
                 });
 
             ui.label("Sample kind:");
