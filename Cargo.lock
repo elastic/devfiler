@@ -753,6 +753,7 @@ dependencies = [
  "serde_json",
  "smallvec",
  "symblib",
+ "tempfile",
  "tikv-jemallocator",
  "tokio",
  "tonic",
