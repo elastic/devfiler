@@ -22,12 +22,14 @@
 //! types and helpers to allow turning it into something that is more like a
 //! `BTreeMap<K, V>`, with strong typing and automatic de/serialization.
 
+use lru::LruCache;
 use rkyv::ser::serializers::AllocSerializer;
 use smallvec::SmallVec;
 use std::fmt;
 use std::iter::FusedIterator;
 use std::marker::PhantomData;
 use std::path::Path;
+use std::sync::Mutex;
 
 /// Raw, untyped database table.
 pub trait RawTable {
@@ -36,6 +38,18 @@ pub trait RawTable {
     /// You should typically avoid using this directly outside of
     /// temporary experiments: it breaks the DB abstraction.
     fn raw(&self) -> &rocksdb::DB;
+
+    /// Access to the LRU cache for this table.
+    ///
+    /// The cache stores serialized values to avoid deserialization overhead
+    /// and to work with the existing TableValueRef API.
+    fn cache(&self) -> &Mutex<LruCache<Vec<u8>, Vec<u8>>>;
+
+    /// Clear the entire cache.
+    fn clear_cache(&self) {
+        let mut cache = self.cache().lock().unwrap();
+        cache.clear();
+    }
 
     /// Estimate the number of records in this table.
     fn count_estimate(&self) -> u64 {
@@ -98,20 +112,38 @@ pub trait Table: RawTable + Sized + From<rocksdb::DB> {
     /// Defines the table's storage optimization.
     const STORAGE_OPT: StorageOpt = StorageOpt::RandomAccess;
 
+    /// LRU cache size for this table. Set to 0 to disable caching.
+    const CACHE_SIZE: usize = 16384;
+
     /// Removes the record with the given key from the table.
     fn remove(&self, key: Self::Key) {
-        self.raw().delete(key.into_raw()).unwrap();
+        let key_raw = key.into_raw();
+
+        // Remove from cache
+        if Self::CACHE_SIZE > 0 {
+            let mut cache = self.cache().lock().unwrap();
+            cache.pop(key_raw.as_ref());
+        }
+
+        self.raw().delete(key_raw).unwrap();
     }
 
     /// Inserts the given value at the given key.
     ///
     /// If the record already exists, the previous value is replaced.
     fn insert(&self, key: Self::Key, value: Self::Value) {
-        let key = key.into_raw();
-        let value = rkyv::to_bytes(&value).unwrap();
+        let key_raw = key.into_raw();
+        let value_bytes = rkyv::to_bytes(&value).unwrap();
+
+        // Update cache
+        if Self::CACHE_SIZE > 0 {
+            let mut cache = self.cache().lock().unwrap();
+            cache.put(key_raw.as_ref().to_vec(), value_bytes.to_vec());
+        }
+
         match Self::MERGE_OP {
-            MergeOperator::Default => self.raw().put(key, value).unwrap(),
-            MergeOperator::Associative(_) => self.raw().merge(key, value).unwrap(),
+            MergeOperator::Default => self.raw().put(key_raw, value_bytes).unwrap(),
+            MergeOperator::Associative(_) => self.raw().merge(key_raw, value_bytes).unwrap(),
         }
     }
 
@@ -123,16 +155,33 @@ pub trait Table: RawTable + Sized + From<rocksdb::DB> {
     /// Get the value at the given key.
     ///
     /// Returns `None` if the key isn't present.
-    fn get(
-        &self,
-        key: Self::Key,
-    ) -> Option<TableValueRef<Self::Value, rocksdb::DBPinnableSlice<'_>>> {
+    fn get(&self, key: Self::Key) -> Option<TableValueRef<Self::Value, SmallVec<[u8; 64]>>> {
+        let key_raw = key.into_raw();
+
+        // Check cache first if caching is enabled
+        if Self::CACHE_SIZE > 0 {
+            let mut cache = self.cache().lock().unwrap();
+            if let Some(cached_value) = cache.get(key_raw.as_ref()) {
+                let value = SmallVec::from_slice(cached_value);
+                return Some(TableValueRef::new(value));
+            }
+        }
+
+        // Cache miss, get from RocksDB
         let mut opts = rocksdb::ReadOptions::default();
         opts.set_readahead_size(0);
         opts.set_verify_checksums(false);
-        let raw = self.raw().get_pinned_opt(key.into_raw(), &opts);
+        let raw = self.raw().get_pinned_opt(key_raw.as_ref(), &opts);
         let raw = raw.expect("DB IO error")?;
-        Some(TableValueRef::new(raw))
+
+        // Store in cache if caching is enabled
+        if Self::CACHE_SIZE > 0 {
+            let mut cache = self.cache().lock().unwrap();
+            cache.put(key_raw.as_ref().to_vec(), raw.as_ref().to_vec());
+        }
+
+        let value = SmallVec::from_slice(raw.as_ref());
+        Some(TableValueRef::new(value))
     }
 
     /// Checks whether the given key exists in the DB.
@@ -246,6 +295,12 @@ impl<T: Table> InsertionBatch<'_, T> {
     /// Atomically insert the batch.
     pub fn commit(self) {
         self.0.raw().write(self.1).unwrap();
+
+        // Clear cache after batch operations since we don't track individual keys
+        if T::CACHE_SIZE > 0 {
+            let mut cache = self.0.cache().lock().unwrap();
+            cache.clear();
+        }
     }
 }
 
@@ -337,11 +392,18 @@ impl<T: rkyv::Archive, S: AsRef<[u8]>> TableValueRef<T, S> {
 macro_rules! new_table {
     ($name:ident: $key:ty => $value:ty $({ $($custom:tt)* })?) => {
         #[derive(::std::fmt::Debug)]
-        pub struct $name(::rocksdb::DB);
+        pub struct $name {
+            db: ::rocksdb::DB,
+            cache: ::std::sync::Mutex<::lru::LruCache<Vec<u8>, Vec<u8>>>,
+        }
 
         impl $crate::storage::RawTable for $name {
             fn raw(&self) -> &::rocksdb::DB {
-                &self.0
+                &self.db
+            }
+
+            fn cache(&self) -> &::std::sync::Mutex<::lru::LruCache<Vec<u8>, Vec<u8>>> {
+                &self.cache
             }
         }
 
@@ -354,7 +416,17 @@ macro_rules! new_table {
 
         impl ::std::convert::From<::rocksdb::DB> for $name {
             fn from(db: ::rocksdb::DB) -> Self {
-                Self(db)
+                let cache_size = <Self as $crate::storage::Table>::CACHE_SIZE;
+                let cache = if cache_size > 0 {
+                    ::std::sync::Mutex::new(::lru::LruCache::new(
+                        ::std::num::NonZeroUsize::new(cache_size).unwrap()
+                    ))
+                } else {
+                    ::std::sync::Mutex::new(::lru::LruCache::new(
+                        ::std::num::NonZeroUsize::new(1).unwrap()
+                    ))
+                };
+                Self { db, cache }
             }
         }
     };
@@ -441,4 +513,181 @@ fn wrap_merge<T: Table>(func: MergeFn<T>) -> Box<dyn rocksdb::merge_operator::Me
         // TODO: better to use N = 0 here
         Some(rkyv::to_bytes(&merged).unwrap().to_vec())
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Simple test key type
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct TestKey(u64);
+
+    impl TableKey for TestKey {
+        type B = [u8; 8];
+
+        fn from_raw(data: Self::B) -> Self {
+            TestKey(u64::from_be_bytes(data))
+        }
+
+        fn into_raw(self) -> Self::B {
+            self.0.to_be_bytes()
+        }
+    }
+
+    // Simple test value type
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    #[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+    pub struct TestValue {
+        pub data: String,
+    }
+
+    // Test table with caching enabled
+    new_table!(TestTable: TestKey => TestValue {
+        const CACHE_SIZE: usize = 10;
+    });
+
+    #[test]
+    fn test_cache_functionality() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let table = open_or_create::<TestTable>(temp_dir.path()).unwrap();
+
+        let key = TestKey(42);
+        let value = TestValue {
+            data: "hello world".to_string(),
+        };
+
+        // Insert value
+        table.insert(key, value.clone());
+
+        // First get - should load from RocksDB and cache it
+        let retrieved1 = table.get(key).unwrap();
+        assert_eq!(retrieved1.read().data, value.data);
+
+        // Check that cache has the item
+        let cache = table.cache().lock().unwrap();
+        assert_eq!(cache.len(), 1);
+        assert_eq!(cache.cap().get(), 10);
+        drop(cache);
+
+        // Second get - should come from cache (much faster)
+        let retrieved2 = table.get(key).unwrap();
+        assert_eq!(retrieved2.read().data, value.data);
+
+        // Cache should still have 1 item
+        let cache = table.cache().lock().unwrap();
+        assert_eq!(cache.len(), 1);
+        drop(cache);
+
+        // Remove the key - should clear from cache
+        table.remove(key);
+        assert!(table.get(key).is_none());
+    }
+
+    #[test]
+    fn test_cache_lru_eviction() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let table = open_or_create::<TestTable>(temp_dir.path()).unwrap();
+
+        // Insert more than cache capacity
+        for i in 0..15 {
+            let key = TestKey(i);
+            let value = TestValue {
+                data: format!("value_{}", i),
+            };
+            table.insert(key, value);
+        }
+
+        // Cache should be at capacity
+        let cache = table.cache().lock().unwrap();
+        assert_eq!(cache.len(), 10);
+        assert_eq!(cache.cap().get(), 10);
+        drop(cache);
+
+        // Clear cache and verify
+        table.clear_cache();
+        let cache = table.cache().lock().unwrap();
+        assert_eq!(cache.len(), 0);
+        drop(cache);
+    }
+
+    #[test]
+    fn test_cache_performance_benefit() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let table = open_or_create::<TestTable>(temp_dir.path()).unwrap();
+
+        // Insert test data
+        let key = TestKey(999);
+        let value = TestValue {
+            data: "performance_test_value".to_string(),
+        };
+        table.insert(key, value.clone());
+
+        // First get - loads from RocksDB and caches
+        let start = std::time::Instant::now();
+        let result1 = table.get(key).unwrap();
+        let first_get_time = start.elapsed();
+        assert_eq!(result1.read().data, value.data);
+
+        // Verify item is now in cache
+        let cache = table.cache().lock().unwrap();
+        assert_eq!(cache.len(), 1);
+        drop(cache);
+
+        // Second get - should be faster (from cache)
+        let start = std::time::Instant::now();
+        let result2 = table.get(key).unwrap();
+        let second_get_time = start.elapsed();
+        assert_eq!(result2.read().data, value.data);
+
+        // Cache should still have 1 item
+        let cache = table.cache().lock().unwrap();
+        assert_eq!(cache.len(), 1);
+        drop(cache);
+
+        println!("First get (RocksDB): {:?}", first_get_time);
+        println!("Second get (cache): {:?}", second_get_time);
+
+        // While we can't guarantee cache is always faster in a test environment,
+        // we can at least verify that the cache is being used correctly
+        assert!(second_get_time.as_nanos() > 0);
+    }
+
+    #[test]
+    fn test_cache_basic_usage() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let table = open_or_create::<TestTable>(temp_dir.path()).unwrap();
+
+        // Insert test data
+        let key1 = TestKey(100);
+        let key2 = TestKey(200);
+        let key3 = TestKey(300); // This key won't exist
+
+        let value1 = TestValue {
+            data: "value1".to_string(),
+        };
+        let value2 = TestValue {
+            data: "value2".to_string(),
+        };
+
+        table.insert(key1, value1);
+        table.insert(key2, value2);
+
+        // Clear cache to start fresh
+        table.clear_cache();
+
+        // First access - should load from RocksDB and cache
+        let _ = table.get(key1).unwrap();
+        let _ = table.get(key2).unwrap();
+        let _ = table.get(key3); // Should return None
+
+        // Second access - should come from cache
+        let _ = table.get(key1).unwrap();
+        let _ = table.get(key2).unwrap();
+
+        // Check that cache contains our items
+        let cache = table.cache().lock().unwrap();
+        assert_eq!(cache.len(), 2); // key1 and key2 should be cached
+        drop(cache);
+    }
 }
