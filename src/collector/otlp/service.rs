@@ -353,11 +353,6 @@ fn process_sample(
             *timestamp / 1_000
         };
 
-        let id = TraceCountId {
-            timestamp,
-            id: DB.generate_id(),
-        };
-
         let stt_idx = sample_type.type_strindex;
         let stu_idx = sample_type.unit_strindex;
         let sample_type_type = get_str(
@@ -378,6 +373,12 @@ fn process_sample(
             _ => SampleKind::Unknown,
         };
 
+        let id = TraceCountId {
+            timestamp,
+            kind,
+            id: DB.generate_id(),
+        };
+
         event_batch.insert(
             id,
             TraceCount {
@@ -387,7 +388,6 @@ fn process_sample(
                 comm: comm.clone().unwrap_or_default().to_owned(),
                 pod_name: None,
                 container_name: None,
-                kind: kind,
             },
         );
     }
