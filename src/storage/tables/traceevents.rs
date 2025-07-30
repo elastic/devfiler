@@ -31,6 +31,7 @@ pub enum SampleKind {
     Mixed,
     OnCPU,
     OffCPU,
+    UProbe,
 }
 impl SampleKind {
     pub fn as_archived(&self) -> ArchivedSampleKind {
@@ -39,6 +40,7 @@ impl SampleKind {
             SampleKind::Mixed => ArchivedSampleKind::Mixed,
             SampleKind::OnCPU => ArchivedSampleKind::OnCPU,
             SampleKind::OffCPU => ArchivedSampleKind::OffCPU,
+            SampleKind::UProbe => ArchivedSampleKind::UProbe,
         }
     }
 }
