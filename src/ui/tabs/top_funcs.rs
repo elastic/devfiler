@@ -320,7 +320,7 @@ fn query_top_funcs(
     let (event_tx, event_rx) = mpsc::sync_channel(4096);
     let table_task = tokio::task::spawn_blocking(move || {
         let mut total_samples = 0;
-        for (id, trace) in DB.trace_events.time_range(start, end) {
+        for (id, trace) in DB.trace_events.time_range(start, end, SampleKind::Mixed) {
             let trace = trace.get();
             total_samples += u64::from(trace.count);
 

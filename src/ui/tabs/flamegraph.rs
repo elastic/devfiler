@@ -342,20 +342,11 @@ fn build_flame_graph(
 ) -> FlameGraphNode {
     // Thread 1: pull events from the table.
     let (event_tx, event_rx) = mpsc::sync_channel(4096);
-    let table_task = tokio::task::spawn_blocking(move || match kind {
-        SampleKind::Mixed | SampleKind::Unknown => {
-            for (_, tc) in DB.trace_events.time_range(start, end) {
-                event_tx
-                    .send(tc)
-                    .expect("should never be closed on RX side (1)");
-            }
-        }
-        _ => {
-            for (_, tc) in DB.trace_events.time_range_with_kind(kind, start, end) {
-                event_tx
-                    .send(tc)
-                    .expect("should never be closed on RX side (1)");
-            }
+    let table_task = tokio::task::spawn_blocking(move || {
+        for (_, tc) in DB.trace_events.time_range(start, end, kind) {
+            event_tx
+                .send(tc)
+                .expect("should never be closed on RX side (1)");
         }
     });
 
