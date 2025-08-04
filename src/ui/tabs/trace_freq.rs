@@ -119,7 +119,7 @@ impl TraceFreqTab {
             .get_or_create((start, end), move || {
                 let aggr = DB
                     .trace_events
-                    .time_range(start, end)
+                    .time_range(start, end, SampleKind::Mixed)
                     .flat_map(|(_, tc)| {
                         let tc = tc.get();
                         let Some(trace) = DB.stack_traces.get(tc.trace_hash) else {
@@ -153,7 +153,7 @@ impl TraceFreqTab {
         let value = self
             .global_dedup_rate_cache
             .get_or_create((start, end), move || {
-                let events = DB.trace_events.sample_events(start, end);
+                let events = DB.trace_events.sample_events(SampleKind::Mixed, start, end);
                 let count = events.len();
                 let sum: u64 = events.values().map(|x| x.count).sum();
                 sum as f64 / count as f64
@@ -173,7 +173,7 @@ impl TraceFreqTab {
             .get_or_create((start, end), move || {
                 let trace_counts = DB
                     .trace_events
-                    .time_range(start, end)
+                    .time_range(start, end, SampleKind::Mixed)
                     // Aggregation #1: rehash trace counts without leaf and sum(count)
                     .into_grouping_map_by(|(_, tc)| {
                         // Query corresponding trace.
@@ -204,7 +204,7 @@ impl TraceFreqTab {
     fn draw_global_freq(&mut self, ui: &mut Ui, start: UtcTimestamp, end: UtcTimestamp) {
         let bars = self.global_cache.get_or_create((start, end), move || {
             DB.trace_events
-                .sample_events(start, end)
+                .sample_events(SampleKind::Mixed, start, end)
                 .into_iter()
                 .into_grouping_map_by(|x| x.1.count)
                 .fold(0, |acc, _, _| acc + 1)
@@ -226,7 +226,7 @@ impl TraceFreqTab {
     fn draw_per_event_freq(&mut self, ui: &mut Ui, start: UtcTimestamp, end: UtcTimestamp) {
         let bars = self.local_cache.get_or_create((start, end), move || {
             DB.trace_events
-                .time_range(start, end)
+                .time_range(start, end, SampleKind::Mixed)
                 .into_grouping_map_by(|(_, tc)| tc.get().count)
                 .fold(0, |acc, _, _| acc + 1)
                 .into_iter()
@@ -253,7 +253,7 @@ impl TraceFreqTab {
             .global_no_leafs_cache
             .get_or_create((start, end), move || {
                 DB.trace_events
-                    .time_range(start, end)
+                    .time_range(start, end, SampleKind::Mixed)
                     // Aggregation #1: rehash trace counts without leaf and sum(count)
                     .into_grouping_map_by(|(_, tc)| {
                         // Query corresponding trace.
