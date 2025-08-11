@@ -31,6 +31,7 @@ pub enum SampleKind {
     Mixed,
     OnCPU,
     OffCPU,
+    UProbe,
     // _MaxKind should always be the last entry
     // in this enum.
     _MaxKind,
@@ -45,6 +46,7 @@ impl TryFrom<u8> for SampleKind {
             1 => Ok(SampleKind::Mixed),
             2 => Ok(SampleKind::OnCPU),
             3 => Ok(SampleKind::OffCPU),
+            4 => Ok(SampleKind::UProbe),
             _ => Err(()),
         }
     }
