@@ -151,6 +151,18 @@ pub struct Frame {
     pub kind: FrameKind,
 }
 
+impl Default for Frame {
+    fn default() -> Self {
+        Frame {
+            id: FrameId {
+                file_id: FileId::from_parts(0, 0),
+                addr_or_line: 0,
+            },
+            kind: FrameKind::Unknown(u8::MAX),
+        }
+    }
+}
+
 impl From<ArchivedFrame> for Frame {
     fn from(x: ArchivedFrame) -> Self {
         Frame {

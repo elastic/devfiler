@@ -172,6 +172,8 @@ fn ingest_locations(dic: &ProfilesDictionary) -> Result<Vec<Frame>, Status> {
             Ok(kind) => kind,
             Err(_e) if locs.first() == Some(loc) => {
             // By convention the first element in dic.location_table is an empty element.
+            // To not conflict with further indicies handling, add a dummy entry.
+                mappings.push(Frame::default());
             continue;
             }
             Err(e) => return Err(e),
