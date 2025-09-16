@@ -20,8 +20,9 @@ use crate::collector::otlp::pb::collector::profiles::v1development::{
     ExportProfilesServiceRequest, ExportProfilesServiceResponse,
 };
 use crate::collector::otlp::pb::common::v1::any_value::Value;
-use crate::collector::otlp::pb::common::v1::KeyValue;
-use crate::collector::otlp::pb::profiles::v1development::{ProfilesDictionary, Sample, ValueType};
+use crate::collector::otlp::pb::profiles::v1development::{
+    KeyValueAndUnit, ProfilesDictionary, Sample, ValueType,
+};
 use crate::collector::Stats;
 use crate::storage::*;
 use chrono::Utc;
@@ -60,22 +61,15 @@ impl pb_collector::profiles_service_server::ProfilesService for ProfilesService 
         for resource_profile in r.resource_profiles {
             for scope_profile in resource_profile.scope_profiles {
                 for profile in scope_profile.profiles {
-                    if profile.sample_type.len() != 1 {
-                        tracing::warn!(
-                            "unexpected length '{}' for profile.sample_type",
-                            profile.sample_type.len()
-                        );
+                    if profile.sample_type.is_none() {
                         continue;
                     }
+                    let st = profile.sample_type.unwrap();
 
-                    let st = &profile.sample_type[0];
                     for sample in &profile.sample {
-                        let frame_list = collect_frame_list(
-                            sample.locations_start_index as usize,
-                            sample.locations_length as usize,
-                            &loc_mapping,
-                            &profile.location_indices,
-                        )?;
+                        let stack = dict.stack_table.get(sample.stack_index as usize);
+                        let frame_list =
+                            collect_frame_list(&loc_mapping, &stack.unwrap().location_indices)?;
                         process_sample(dict, &st, sample, frame_list)?;
                     }
                 }
@@ -120,7 +114,8 @@ fn get_str_opt<'tab>(
 // get_attr looks up indices in table and returns the value where the first key at one of
 // these indices is field.
 fn get_attr<'tab>(
-    table: &'tab Vec<KeyValue>,
+    str_table: &Vec<String>,
+    kvu_table: &'tab Vec<KeyValueAndUnit>,
     indices: Vec<i32>,
     field: &str,
 ) -> Result<&'tab str, Status> {
@@ -129,13 +124,15 @@ fn get_attr<'tab>(
     }
 
     for idx in indices {
-        let Some(kv) = table.get(idx as usize) else {
+        let Some(kv) = kvu_table.get(idx as usize) else {
             return Err(Status::invalid_argument(format!(
                 "index {idx} out of bounds"
             )));
         };
 
-        if kv.key != field {
+        let attr_key = get_str(str_table, kv.key_strindex.try_into().unwrap(), "attr_key")?;
+
+        if attr_key != field {
             // The key at idx in the table does not match.
             continue;
         }
@@ -166,7 +163,21 @@ fn ingest_locations(dic: &ProfilesDictionary) -> Result<Vec<Frame>, Status> {
     let mut mappings = Vec::with_capacity(locs.len());
 
     for loc in locs {
-        let kind = get_attr(atab, loc.attribute_indices.to_vec(), "profile.frame.type")?;
+        let kind = match get_attr(
+            stab,
+            atab,
+            loc.attribute_indices.to_vec(),
+            "profile.frame.type",
+        ) {
+            Ok(kind) => kind,
+            Err(_e) if locs.first() == Some(loc) => {
+                // By convention the first element in dic.location_table is an empty element.
+                // To not conflict with further indicies handling, add a dummy entry.
+                mappings.push(Frame::default());
+                continue;
+            }
+            Err(e) => return Err(e),
+        };
         let kind = match kind {
             "native" => FrameKind::Regular(InterpKind::Native),
             "kernel" => FrameKind::Regular(InterpKind::Kernel),
@@ -185,7 +196,7 @@ fn ingest_locations(dic: &ProfilesDictionary) -> Result<Vec<Frame>, Status> {
                 return Err(Status::invalid_argument(format!(
                     "unsupported frame kind: {}",
                     kind
-                )))
+                )));
             }
         };
 
@@ -200,7 +211,7 @@ fn ingest_locations(dic: &ProfilesDictionary) -> Result<Vec<Frame>, Status> {
             continue;
         }
 
-        let Some(mapping) = &dic.mapping_table.get(loc.mapping_index.unwrap() as usize) else {
+        let Some(mapping) = &dic.mapping_table.get(loc.mapping_index as usize) else {
             return Err(Status::invalid_argument("mapping index is out of bounds"));
         };
 
@@ -208,12 +219,14 @@ fn ingest_locations(dic: &ProfilesDictionary) -> Result<Vec<Frame>, Status> {
         let generated_build_id;
         let build_id_str = if !mapping.attribute_indices.is_empty() {
             build_id = get_attr(
+                stab,
                 atab,
                 mapping.attribute_indices.to_vec(),
                 "process.executable.build_id.htlhash", // OTel Profiling specific build ID.
             )
             .or_else(|_| {
                 get_attr(
+                    stab,
                     atab,
                     mapping.attribute_indices.to_vec(),
                     "process.executable.build_id.profiling", // Legacy OTel Profiling specific build ID.
@@ -337,6 +350,7 @@ fn process_sample(
     };
 
     let comm = get_attr(
+        &dict.string_table,
         &dict.attribute_table,
         sample.attribute_indices.to_vec(),
         "thread.name",
@@ -398,25 +412,16 @@ fn process_sample(
 }
 
 fn collect_frame_list<V>(
-    loc_start: usize,
-    loc_len: usize,
     loc_mapping: &Vec<V>,
-    profile_location_indices: &Vec<i32>,
+    location_indices: &Vec<i32>,
 ) -> Result<Vec<V>, Status>
 where
     V: Copy,
 {
-    let loc_rng = loc_start..loc_start.saturating_add(loc_len);
-
     // Collect frame list.
-    let mut frame_list = Vec::with_capacity(loc_rng.len().min(128));
-    for loc_index in loc_rng {
-        let Some(location_table_idx) = profile_location_indices.get(loc_index as usize) else {
-            return Err(Status::invalid_argument(
-                "location_indices: index is out of bounds",
-            ));
-        };
-        let Some(frame) = loc_mapping.get(*location_table_idx as usize) else {
+    let mut frame_list = Vec::with_capacity(location_indices.len().min(128));
+    for loc_index in location_indices {
+        let Some(frame) = loc_mapping.get(*loc_index as usize) else {
             return Err(Status::invalid_argument(
                 "location_table: index is out of bounds",
             ));
@@ -439,23 +444,23 @@ mod tests {
         let location_indices = vec![4, 9, 6, 2, 7, 4, 4, 2, 0, 1, 2, 3, 5];
 
         assert_eq!(
-            collect_frame_list(0, 2, &loc_mapping, &location_indices)?,
-            vec![4, 9],
+            collect_frame_list(&loc_mapping, &location_indices)?,
+            vec![4, 9, 6, 2, 7, 4, 4, 2, 0, 1, 2, 3, 5],
             "location_indices: {{0,1}}"
         );
         assert_eq!(
-            collect_frame_list(1, 0, &loc_mapping, &location_indices)?,
+            collect_frame_list(&loc_mapping, &Vec::<i32>::new())?,
             Vec::<i32>::new(),
             "zero-length trace"
         );
         assert_eq!(
-            collect_frame_list(0, location_indices.len(), &loc_mapping, &location_indices)?,
+            collect_frame_list(&loc_mapping, &location_indices)?,
             location_indices,
             "trace takes all indices in location_indices"
         );
         assert_eq!(
-            collect_frame_list(2, 0, &loc_mapping, &vec![0i32, 1i32])?,
-            Vec::<i32>::new(),
+            collect_frame_list(&loc_mapping, &vec![0i32, 1i32])?,
+            vec![0, 1],
             "zero-length trace with loc_start out-of-bounds"
         );
 
@@ -465,31 +470,13 @@ mod tests {
     #[test]
     fn sample_frame_list_err() -> Result<(), Status> {
         let loc_mapping = (0..11).collect_vec();
-
         assert_eq!(
-            collect_frame_list(0, 3, &loc_mapping, &vec![0i32, 1i32])
-                .unwrap_err()
-                .message(),
-            "location_indices: index is out of bounds",
-            "sample trace size: 3, len(location_indices): 2"
-        );
-
-        assert_eq!(
-            collect_frame_list(1, 2, &loc_mapping, &vec![0i32, 1i32])
-                .unwrap_err()
-                .message(),
-            "location_indices: index is out of bounds",
-            "sample trace index start: 1, sample trace length: 2, len(location_indices): 2"
-        );
-
-        assert_eq!(
-            collect_frame_list(0, 2, &loc_mapping, &vec![1i32, 13i32])
+            collect_frame_list(&loc_mapping, &vec![12i32, 13i32])
                 .unwrap_err()
                 .message(),
             "location_table: index is out of bounds",
             "trace location indices: {{1,13}}, len(location_table): 2"
         );
-
         Ok(())
     }
 }
