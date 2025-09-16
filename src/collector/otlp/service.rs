@@ -163,12 +163,19 @@ fn ingest_locations(dic: &ProfilesDictionary) -> Result<Vec<Frame>, Status> {
     let mut mappings = Vec::with_capacity(locs.len());
 
     for loc in locs {
-        let kind = get_attr(
+        let kind = match get_attr(
             stab,
             atab,
             loc.attribute_indices.to_vec(),
             "profile.frame.type",
-        )?;
+        ) {
+            Ok(kind) => kind,
+            Err(_e) if locs.first() == Some(loc) => {
+            // By convention the first element in dic.location_table is an empty element.
+            continue;
+            }
+            Err(e) => return Err(e),
+        };
         let kind = match kind {
             "native" => FrameKind::Regular(InterpKind::Native),
             "kernel" => FrameKind::Regular(InterpKind::Kernel),
