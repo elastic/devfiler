@@ -16,7 +16,6 @@
 // under the License.
 
 use super::pb::collector::profiles::v1development as pb_collector;
-use crate::collector::Stats;
 use crate::collector::otlp::pb::collector::profiles::v1development::{
     ExportProfilesServiceRequest, ExportProfilesServiceResponse,
 };
@@ -24,6 +23,7 @@ use crate::collector::otlp::pb::common::v1::any_value::Value;
 use crate::collector::otlp::pb::profiles::v1development::{
     KeyValueAndUnit, ProfilesDictionary, Sample, ValueType,
 };
+use crate::collector::Stats;
 use crate::storage::*;
 use chrono::Utc;
 use std::hash::Hash;
