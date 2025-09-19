@@ -35,16 +35,13 @@ jobs:
     steps:
       - name: Get token
         id: get_token
-        uses: tibdex/github-app-token@3beb63f4bd073e61482598c45c71c1019b59b73a # v2.1.0
+        uses: actions/create-github-app-token@v2
         with:
-          app_id: ${{ secrets.ELASTIC_OBSERVABILITY_APP_ID }}
-          private_key: ${{ secrets.ELASTIC_OBSERVABILITY_APP_PEM }}
-          permissions: >-
-            {
-              "contents": "read"
-            }
-          repositories: >-
-            ["devfiler"]
+          app-id: ${{ secrets.ELASTIC_OBSERVABILITY_APP_ID }}
+          private-key: ${{ secrets.ELASTIC_OBSERVABILITY_APP_PEM }}
+          permission-contents: read
+          repositories: |
+            devfiler
 
       - name: Checkout code
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
