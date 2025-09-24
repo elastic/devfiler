@@ -383,7 +383,7 @@ fn process_sample(
         // OTel eBPF profiler - https://github.com/open-telemetry/opentelemetry-ebpf-profiler/pull/196
         let kind = match (sample_type_type, sample_type_unit) {
             ("samples", "count") => SampleKind::OnCPU,
-            ("events", "nanoseconds") => SampleKind::OffCPU,
+            ("off_cpu", "nanoseconds") => SampleKind::OffCPU,
             ("events", "count") => SampleKind::UProbe,
             _ => SampleKind::Unknown,
         };
