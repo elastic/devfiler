@@ -46,6 +46,8 @@ pub trait RawTable {
     fn cache(&self) -> &Mutex<LruCache<Vec<u8>, Vec<u8>>>;
 
     /// Clear the entire cache.
+    /// Helper function for tests only so far.
+    #[allow(dead_code)]
     fn clear_cache(&self) {
         let mut cache = self.cache().lock().unwrap();
         cache.clear();
@@ -246,6 +248,7 @@ pub enum MergeOperator<T: Table> {
     Default,
 
     /// Custom associative merge operator.
+    #[allow(dead_code)]
     Associative(MergeFn<T>),
 }
 

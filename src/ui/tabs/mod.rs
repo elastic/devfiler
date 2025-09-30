@@ -28,7 +28,6 @@ pub enum Tab {
     Log,
 
     // dev-mode tabs
-    Metrics,
     TraceFreq,
     DbStats,
     GrpcLog,
@@ -41,7 +40,6 @@ impl fmt::Display for Tab {
             Tab::TopFunctions => "Top functions",
             Tab::Executables => "Executables",
             Tab::Log => "Log",
-            Tab::Metrics => "Metrics",
             Tab::TraceFreq => "Trace frequency",
             Tab::DbStats => "DB Stats",
             Tab::GrpcLog => "gRPC",
@@ -73,9 +71,6 @@ pub trait TabWidget {
 
 mod executables;
 pub use executables::*;
-
-mod metrics;
-pub use metrics::*;
 
 mod top_funcs;
 pub use top_funcs::*;
