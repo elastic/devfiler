@@ -39,7 +39,6 @@ pub struct Db {
     pub stack_traces: StackTraces,
     pub stack_frames: StackFrames,
     pub executables: Executables,
-    pub metrics: Metrics,
 
     // Custom data storage.
     pub symbols: SymDb,
@@ -47,7 +46,7 @@ pub struct Db {
 
 impl Db {
     /// Number of tables.
-    pub const NUM_TABLES: usize = 5;
+    pub const NUM_TABLES: usize = 4;
 
     /// Create or open the database.
     fn open() -> anyhow::Result<Arc<Self>> {
@@ -68,7 +67,6 @@ impl Db {
             stack_traces: open_or_create(db_dir)?,
             stack_frames: open_or_create(db_dir)?,
             executables: open_or_create(db_dir)?,
-            metrics: open_or_create(db_dir)?,
             symbols: SymDb::open_at(db_dir.join("symbols"))?,
         }))
     }
@@ -102,7 +100,6 @@ impl Db {
             &self.stack_traces,
             &self.stack_frames,
             &self.executables,
-            &self.metrics,
         ]
     }
 }
@@ -116,9 +113,6 @@ pub use dbtypes::*;
 
 mod tables;
 pub use tables::*;
-
-mod metricspec;
-pub use metricspec::*;
 
 mod errorspec;
 pub use errorspec::*;

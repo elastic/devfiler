@@ -28,13 +28,11 @@
 //! could come up for devfiler.
 
 mod executables;
-mod metrics;
 mod stackframes;
 mod stacktraces;
 mod traceevents;
 
 pub use executables::*;
-pub use metrics::*;
 pub use stackframes::*;
 pub use stacktraces::*;
 pub use traceevents::*;

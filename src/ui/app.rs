@@ -65,7 +65,6 @@ impl DevfilerUi {
                 Box::new(tabs::ExecutablesTab::default()),
                 Box::new(tabs::LogTab::default()),
                 // Keep dev mode tabs below.
-                Box::new(tabs::MetricsTab::default()),
                 Box::new(tabs::TraceFreqTab::default()),
                 Box::new(tabs::DbStatsTab::default()),
                 Box::new(tabs::GrpcLogTab::default()),

@@ -28,7 +28,6 @@
           # Filter source tree to avoid unnecessary rebuilds.
           includedSuffixes = [
             ".proto"
-            "metrics.json"
             "errors.json"
             "icon.png"
             "add-data.md"
