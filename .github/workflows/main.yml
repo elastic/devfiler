@@ -33,20 +33,10 @@ jobs:
         os: [ ubuntu-22.04, macos-14-large, macos-14-xlarge ]
 
     steps:
-      - name: Get token
-        id: get_token
-        uses: actions/create-github-app-token@v2
-        with:
-          app-id: ${{ secrets.ELASTIC_OBSERVABILITY_APP_ID }}
-          private-key: ${{ secrets.ELASTIC_OBSERVABILITY_APP_PEM }}
-          permission-contents: read
-          repositories: |
-            devfiler
-
       - name: Checkout code
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
         with:
-          token: ${{ steps.get_token.outputs.token }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           submodules: true
 
       - name: Install Nix
