@@ -39,7 +39,7 @@ jobs:
           submodules: true
 
       - name: Install Nix
-        uses: cachix/install-nix-action@9280e7aca88deada44c930f1e2c78e21c3ae3edd # v31
+        uses: cachix/install-nix-action@fd24c48048070c1be9acd18c9d369a83f0fe94d7 # v31
         with:
           install_url: https://releases.nixos.org/nix/nix-2.24.10/install
 
