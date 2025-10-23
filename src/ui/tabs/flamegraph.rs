@@ -75,6 +75,20 @@ impl TabWidget for FlameGraphTab {
         ui.columns(2, |ui| {
             ui[0].with_layout(Layout::left_to_right(Align::Min), |ui| {
                 ui.checkbox(&mut self.show_inline, "Show inline");
+
+                // Show sandwich view indicator
+                if self.widget.sandwich_view.is_some() {
+                    ui.label(
+                        egui::RichText::new(" 🔍 Sandwich View Active (Double-click to exit)")
+                            .color(Color32::YELLOW),
+                    );
+                } else {
+                    ui.label(
+                        egui::RichText::new(" Ctrl+Click on a frame to show callers/callees")
+                            .color(Color32::DARK_GRAY)
+                            .italics(),
+                    );
+                }
             });
             ui[1].with_layout(Layout::right_to_left(Align::Min), |ui| {
                 let hint = format!("{} Filter ...", icons::FUNNEL);
@@ -95,6 +109,16 @@ struct FlameGraphWidget {
     origin: Pos2,
     x_zoom: f32,
     filter: String,
+    sandwich_view: Option<SandwichView>,
+}
+
+/// Sandwich view showing callers above and callees below a selected frame
+struct SandwichView {
+    #[allow(dead_code)]
+    selected_frame: FrameId,
+    selected_text: String,
+    callers: FlameGraphNode,
+    callees: FlameGraphNode,
 }
 
 impl Default for FlameGraphWidget {
@@ -103,6 +127,7 @@ impl Default for FlameGraphWidget {
             origin: Pos2::ZERO,
             x_zoom: 1.0,
             filter: "".to_string(),
+            sandwich_view: None,
         }
     }
 }
@@ -113,7 +138,7 @@ impl FlameGraphWidget {
             let size = ui.available_size_before_wrap();
             let (response, painter) = ui.allocate_painter(size, Sense::click_and_drag());
 
-            self.process_inputs(ui, size, &response);
+            self.process_inputs(ui, size, &response, root);
 
             let to_screen = RectTransform::from_to(
                 Rect::from_min_size(self.origin, response.rect.size()),
@@ -121,25 +146,212 @@ impl FlameGraphWidget {
             );
 
             let visible_x_range = Rangef::new(self.origin.x, self.origin.x + size.x);
+            let clicked = response.clicked() && !response.double_clicked();
+            let ctrl_held = ui.input(|i| i.modifiers.ctrl);
+            let hover_pos = response.hover_pos();
 
-            self.draw_level(
-                ui.ctx(),
-                cfg,
-                &painter,
-                &to_screen,
-                visible_x_range,
-                response.hover_pos(),
-                response.clicked() && !response.double_clicked(),
-                Pos2::ZERO,
-                size.x * self.x_zoom,
-                &root,
-                &root,
-            );
+            // Check if we're in sandwich view mode
+            let is_sandwich_view = self.sandwich_view.is_some();
+            if is_sandwich_view {
+                // Draw sandwich view: callers on top, selected in middle, callees on bottom
+                self.draw_sandwich_view(
+                    ui.ctx(),
+                    cfg,
+                    &painter,
+                    &to_screen,
+                    visible_x_range,
+                    hover_pos,
+                    size,
+                );
+            } else {
+                // Normal flamegraph view
+                self.draw_level(
+                    ui.ctx(),
+                    cfg,
+                    &painter,
+                    &to_screen,
+                    visible_x_range,
+                    hover_pos,
+                    clicked,
+                    ctrl_held,
+                    Pos2::ZERO,
+                    size.x * self.x_zoom,
+                    root,
+                    root,
+                );
+            }
         });
     }
 
+    /// Draw the sandwich view with callers above and callees below
+    fn draw_sandwich_view(
+        &mut self,
+        ctx: &egui::Context,
+        cfg: &DevfilerConfig,
+        painter: &Painter,
+        to_screen: &RectTransform,
+        visible_x_range: Rangef,
+        cursor_hover_pos: Option<Pos2>,
+        size: Vec2,
+    ) {
+        // Take ownership temporarily to avoid borrowing issues
+        let sandwich = self.sandwich_view.take().unwrap();
+        let width = size.x * self.x_zoom;
+
+        // Draw callers flamegraph upside-down, so flames grow upward from the selected frame
+        let selected_height = FLAME_HEIGHT;
+        let callers_height = (size.y - selected_height) / 2.0;
+        let base_y = callers_height + selected_height;
+
+        // Draw the selected frame at the base
+        let selected_rect = Rect::from_min_size(pos2(0.0, base_y), vec2(width, FLAME_HEIGHT));
+        let screen_rect = to_screen.transform_rect(selected_rect);
+        painter.add(Shape::rect_filled(
+            screen_rect,
+            Rounding::ZERO,
+            Color32::YELLOW,
+        ));
+        painter.add(Shape::rect_stroke(
+            screen_rect,
+            Rounding::ZERO,
+            Stroke::new(2.0, Color32::BLACK),
+        ));
+        painter.text(
+            to_screen * selected_rect.min + vec2(4.0, 4.0),
+            Align2::LEFT_TOP,
+            &sandwich.selected_text,
+            FontId::monospace(11.0),
+            Color32::BLACK,
+        );
+
+        // Helper to draw a single inverted caller flame
+        fn draw_inverted_caller_flame(
+            _widget: &mut FlameGraphWidget,
+            _ctx: &egui::Context,
+            _cfg: &DevfilerConfig,
+            painter: &Painter,
+            to_screen: &RectTransform,
+            visible_x_range: Rangef,
+            _cursor_hover_pos: Option<Pos2>,
+            x: f32,
+            base_y: f32,
+            width: f32,
+            node: &FlameGraphNode,
+            level: usize,
+        ) {
+            if width < MIN_WIDTH {
+                return;
+            }
+
+            let y = base_y - (level as f32 * FLAME_HEIGHT);
+            let rect = Rect::from_min_size(pos2(x, y), vec2(width, FLAME_HEIGHT));
+            let flame_range = Rangef::new(rect.min.x, rect.max.x);
+            if flame_range.intersection(visible_x_range.clone()).span() <= 0.0 {
+                return;
+            }
+
+            let screen_rect = to_screen.transform_rect(rect);
+            painter.add(Shape::rect_filled(
+                screen_rect,
+                Rounding::ZERO,
+                node.bg_color,
+            ));
+            painter.add(Shape::rect_stroke(
+                screen_rect,
+                Rounding::ZERO,
+                Stroke::new(0.5, Color32::BLACK),
+            ));
+
+            if width > MIN_TEXT_WIDTH {
+                painter.with_clip_rect(screen_rect).text(
+                    to_screen * rect.min + vec2(4.0, 4.0),
+                    Align2::LEFT_TOP,
+                    &node.text,
+                    FontId::monospace(11.0),
+                    node.fg_color,
+                );
+            }
+
+            let mut child_x = x;
+            for child in &node.children {
+                let child_width = width * (child.weight as f32 / node.weight.max(1) as f32);
+                draw_inverted_caller_flame(
+                    _widget,
+                    _ctx,
+                    _cfg,
+                    painter,
+                    to_screen,
+                    visible_x_range.clone(),
+                    _cursor_hover_pos,
+                    child_x,
+                    base_y,
+                    child_width,
+                    child,
+                    level + 1,
+                );
+                child_x += child_width;
+            }
+        }
+
+        // Draw each caller flame above the selected frame, side by side
+        let mut x_offset = 0.0;
+        for child in &sandwich.callers.children {
+            let flame_width = width * (child.weight as f32 / sandwich.callers.weight.max(1) as f32);
+            draw_inverted_caller_flame(
+                self,
+                ctx,
+                cfg,
+                painter,
+                to_screen,
+                visible_x_range.clone(),
+                cursor_hover_pos,
+                x_offset,
+                base_y,
+                flame_width,
+                child,
+                1,
+            );
+            x_offset += flame_width;
+        }
+
+        // Draw callees (growing downwards from selected frame, in lower half)
+        // Skip the "Callees" meta node and draw its children directly
+        let callees_y = base_y + FLAME_HEIGHT;
+        if !sandwich.callees.children.is_empty() {
+            let mut x_offset = 0.0;
+            for child in &sandwich.callees.children {
+                let child_width =
+                    width * (child.weight as f32 / sandwich.callees.weight.max(1) as f32);
+                self.draw_level(
+                    ctx,
+                    cfg,
+                    painter,
+                    to_screen,
+                    visible_x_range.clone(),
+                    cursor_hover_pos,
+                    false, // No clicking in sandwich view for now
+                    false,
+                    pos2(x_offset, callees_y),
+                    child_width,
+                    child,
+                    child,
+                );
+                x_offset += child_width;
+            }
+        }
+
+        // Restore the sandwich view
+        self.sandwich_view = Some(sandwich);
+    }
+
     /// Process dragging, scrolling and zooming.
-    fn process_inputs(&mut self, ui: &mut Ui, size: Vec2, response: &Response) {
+    fn process_inputs(
+        &mut self,
+        ui: &mut Ui,
+        size: Vec2,
+        response: &Response,
+        _root: &FlameGraphNode,
+    ) {
         let Some(cursor) = response.hover_pos() else {
             // Ignore inputs when not hovered.
             return;
@@ -149,6 +361,7 @@ impl FlameGraphWidget {
         if response.double_clicked() {
             self.origin = Pos2::ZERO;
             self.x_zoom = 1.0;
+            self.sandwich_view = None; // Exit sandwich view on double-click
             return;
         }
 
@@ -198,6 +411,7 @@ impl FlameGraphWidget {
         visible_x_range: Rangef,
         cursor_hover_pos: Option<Pos2>,
         clicked: bool,
+        ctrl_held: bool,
         draw_pos: Pos2,
         avail_width: f32,
         root: &FlameGraphNode,
@@ -251,9 +465,17 @@ impl FlameGraphWidget {
                 );
 
                 if clicked && flame.weight >= 1 {
-                    self.x_zoom = root.weight as f32 / flame.weight as f32;
-                    self.origin.x =
-                        draw_pos.x / avail_width * (to_screen.from().width() * self.x_zoom);
+                    if ctrl_held {
+                        // Ctrl+Click: Enter sandwich view mode
+                        self.sandwich_view = Some(build_sandwich_view(root, flame.id));
+                        self.origin = Pos2::ZERO;
+                        self.x_zoom = 1.0;
+                    } else {
+                        // Normal click: Zoom to frame
+                        self.x_zoom = root.weight as f32 / flame.weight as f32;
+                        self.origin.x =
+                            draw_pos.x / avail_width * (to_screen.from().width() * self.x_zoom);
+                    }
                 }
             }
         }
@@ -268,6 +490,7 @@ impl FlameGraphWidget {
                 visible_x_range.clone(),
                 cursor_hover_pos,
                 clicked,
+                ctrl_held,
                 pos2(offset, draw_pos.y + FLAME_HEIGHT),
                 avail_width,
                 root,
@@ -390,7 +613,7 @@ fn build_flame_graph(
 }
 
 /// Node in the flame graph tree structure.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct FlameGraphNode {
     pub weight: u64,
     pub fg_color: Color32,
@@ -523,5 +746,147 @@ impl FlameGraphNode {
         for child in &mut self.children {
             child.sort_children();
         }
+    }
+}
+
+/// Build a sandwich view for a given frame ID
+fn build_sandwich_view(root: &FlameGraphNode, frame_id: FrameId) -> SandwichView {
+    let mut callers = FlameGraphNode::new_meta_node("Callers".to_string(), 0);
+    let mut callees = FlameGraphNode::new_meta_node("Callees".to_string(), 0);
+    let mut selected_info: Option<String> = None;
+
+    // Traverse the tree and collect all paths that contain the target frame
+    collect_paths_through_frame(
+        root,
+        frame_id,
+        &mut Vec::new(),
+        &mut callers,
+        &mut callees,
+        &mut selected_info,
+    );
+
+    callers.sort_children();
+    callees.sort_children();
+
+    let selected_text = selected_info.unwrap_or_else(|| "Unknown Frame".to_string());
+
+    SandwichView {
+        selected_frame: frame_id,
+        selected_text,
+        callers,
+        callees,
+    }
+}
+
+/// Helper function to collect caller and callee paths through a specific frame
+fn collect_paths_through_frame(
+    node: &FlameGraphNode,
+    target_frame: FrameId,
+    path_above: &mut Vec<(FrameId, Color32, Color32, String)>,
+    callers_root: &mut FlameGraphNode,
+    callees_root: &mut FlameGraphNode,
+    selected_info: &mut Option<String>,
+) {
+    // Check if this node is the target frame
+    if node.id == target_frame {
+        // Found the target frame!
+        // Store the frame's display information
+        if selected_info.is_none() {
+            *selected_info = Some(node.text.clone());
+        }
+
+        // Insert the caller path (inverted) into callers_root
+        if !path_above.is_empty() {
+            insert_caller_path(callers_root, path_above, node.weight);
+        }
+
+        // Insert all callees into callees_root
+        insert_callee_subtree(callees_root, node);
+        return;
+    }
+
+    // Continue searching in children
+    // Skip adding the root frame (100% of all CPU cycles) to the path
+    let is_root_frame = node.id.addr_or_line == 0 && node.id.file_id == FileId::from(0);
+    if !is_root_frame {
+        path_above.push((node.id, node.bg_color, node.fg_color, node.text.clone()));
+    }
+    for child in &node.children {
+        collect_paths_through_frame(
+            child,
+            target_frame,
+            path_above,
+            callers_root,
+            callees_root,
+            selected_info,
+        );
+    }
+    if !is_root_frame {
+        path_above.pop();
+    }
+}
+
+/// Insert a caller path (inverted, from target up to root)
+/// Insert a caller path so the flamegraph grows downward from the selected frame
+fn insert_caller_path(
+    root: &mut FlameGraphNode,
+    path: &[(FrameId, Color32, Color32, String)],
+    weight: u64,
+) {
+    root.weight += weight;
+    // Walk the path in reverse (from the immediate caller down to the root)
+    // so that level 1 is the direct caller and the root is at the top
+    let mut current = root;
+    for (frame_id, bg_color, fg_color, text) in path.iter().rev() {
+        // Find or create child with this frame_id
+        if let Some(child) = current.children.iter_mut().find(|x| x.id == *frame_id) {
+            child.weight += weight;
+            current = unsafe { &mut *(child as *mut _) };
+        } else {
+            current.children.push(FlameGraphNode {
+                weight,
+                fg_color: *fg_color,
+                bg_color: *bg_color,
+                id: *frame_id,
+                text: text.clone(),
+                inline_skip: 0,
+                children: vec![],
+            });
+            current = current.children.last_mut().unwrap();
+        }
+    }
+}
+
+/// Insert all callees of the target frame
+fn insert_callee_subtree(root: &mut FlameGraphNode, node: &FlameGraphNode) {
+    root.weight += node.weight_children();
+
+    for child in &node.children {
+        insert_callee_node(root, child);
+    }
+}
+
+/// Recursively insert a callee node and its descendants
+fn insert_callee_node(parent: &mut FlameGraphNode, node: &FlameGraphNode) {
+    // Find or create child with this frame_id
+    let child = if let Some(existing) = parent.children.iter_mut().find(|x| x.id == node.id) {
+        existing.weight += node.weight;
+        existing
+    } else {
+        parent.children.push(FlameGraphNode {
+            weight: node.weight,
+            fg_color: node.fg_color,
+            bg_color: node.bg_color,
+            id: node.id,
+            text: node.text.clone(),
+            inline_skip: node.inline_skip,
+            children: vec![],
+        });
+        parent.children.last_mut().unwrap()
+    };
+
+    // Recursively add all descendants
+    for grandchild in &node.children {
+        insert_callee_node(child, grandchild);
     }
 }
