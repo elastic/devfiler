@@ -33,7 +33,7 @@ use std::sync::mpsc;
 const FLAME_HEIGHT: f32 = 20.0;
 const MIN_WIDTH: f32 = 1.0;
 const MIN_TEXT_WIDTH: f32 = 7.0;
-const MAX_FRAMES: f32 = 128.0;
+const MAX_FRAMES: f32 = 1024.0;
 
 pub struct FlameGraphTab {
     cached_root: Cached<FlameGraphNode>,
