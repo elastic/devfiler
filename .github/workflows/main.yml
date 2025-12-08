@@ -27,10 +27,10 @@ jobs:
         # Backing architectures based on information from
         # https://github.com/actions/runner-images/
         #
-        # ubuntu-22.04 - amd64
-        # macos-14-large - amd64
-        # macos-14-xlarge - arm64
-        os: [ ubuntu-22.04, macos-14-large, macos-14-xlarge ]
+        # ubuntu-24.04 - amd64
+        # macos-15-large - amd64
+        # macos-15-xlarge - arm64
+        os: [ ubuntu-24.04, macos-15-large, macos-15-xlarge ]
 
     steps:
       - name: Checkout code
