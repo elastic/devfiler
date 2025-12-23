@@ -2,6 +2,7 @@
 name = "devfiler"
 version = "0.14.0"
 edition = "2021"
+rust-version = "1.84.1"
 license = "Apache-2.0"
 
 [profile.dev]
