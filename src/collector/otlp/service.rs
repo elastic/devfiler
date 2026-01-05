@@ -66,7 +66,7 @@ impl pb_collector::profiles_service_server::ProfilesService for ProfilesService 
                     }
                     let st = profile.sample_type.unwrap();
 
-                    for sample in &profile.sample {
+                    for sample in &profile.samples {
                         let stack = dict.stack_table.get(sample.stack_index as usize);
                         let frame_list =
                             collect_frame_list(&loc_mapping, &stack.unwrap().location_indices)?;
@@ -237,7 +237,7 @@ fn ingest_locations(dic: &ProfilesDictionary) -> Result<Vec<Frame>, Status> {
             // Fallback option: Generate xxh3 hash over all fields of all loc.line elements
             // if there is no build_id attribute.
             let mut hasher = xxh3::Xxh3::new();
-            for line in &loc.line {
+            for line in &loc.lines {
                 if line.function_index != 0 {
                     if let Some(fn_ref) = ftab.get(line.function_index as usize) {
                         // Hash function name if available
@@ -297,7 +297,7 @@ fn ingest_locations(dic: &ProfilesDictionary) -> Result<Vec<Frame>, Status> {
             continue;
         }
 
-        let Some(line) = loc.line.first() else {
+        let Some(line) = loc.lines.first() else {
             continue;
         };
 
