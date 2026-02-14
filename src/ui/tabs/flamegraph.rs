@@ -63,7 +63,7 @@ impl TabWidget for FlameGraphTab {
         kind: SampleKind,
         start: UtcTimestamp,
         end: UtcTimestamp,
-    ) {
+    ) -> Option<TabAction> {
         let show_inline = self.show_inline;
         let root = self
             .cached_root
@@ -97,7 +97,8 @@ impl TabWidget for FlameGraphTab {
         });
         ui.add_space(5.0);
 
-        self.widget.draw(ui, cfg, &*root)
+        self.widget.draw(ui, cfg, &*root);
+        None
     }
 }
 

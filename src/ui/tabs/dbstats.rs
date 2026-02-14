@@ -34,7 +34,7 @@ impl TabWidget for DbStatsTab {
         _kind: SampleKind,
         _start: UtcTimestamp,
         _end: UtcTimestamp,
-    ) {
+    ) -> Option<TabAction> {
         ScrollArea::vertical().show(ui, |ui| {
             let clicked = ui.small_button("Flush Event Data").clicked();
             if clicked {
@@ -47,6 +47,7 @@ impl TabWidget for DbStatsTab {
                 });
             }
         });
+        None
     }
 
     fn show_tab_selector(&self, cfg: &DevfilerConfig) -> bool {

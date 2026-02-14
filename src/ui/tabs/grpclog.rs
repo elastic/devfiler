@@ -42,11 +42,12 @@ impl TabWidget for GrpcLogTab {
         _kind: SampleKind,
         _start: UtcTimestamp,
         _end: UtcTimestamp,
-    ) {
+    ) -> Option<TabAction> {
         ui.columns(2, |ui| {
             ui[0].push_id("grpc-msg-list", |ui| self.draw_msg_list(ui, &cfg.collector));
             ui[1].push_id("grpc-msg-inspector", |ui| self.draw_msg_info(ui));
         });
+        None
     }
 
     fn show_tab_selector(&self, cfg: &DevfilerConfig) -> bool {

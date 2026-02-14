@@ -23,6 +23,7 @@ use std::fmt;
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Hash)]
 pub enum Tab {
     FlameGraph,
+    FlameScope,
     TopFunctions,
     Executables,
     Log,
@@ -33,10 +34,22 @@ pub enum Tab {
     GrpcLog,
 }
 
+/// Action returned from a tab that the main app should handle
+#[derive(Debug, Clone)]
+pub enum TabAction {
+    /// Switch to a different tab with a new time range
+    SwitchTabWithTimeRange {
+        tab: Tab,
+        start: UtcTimestamp,
+        end: UtcTimestamp,
+    },
+}
+
 impl fmt::Display for Tab {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             Tab::FlameGraph => "Flamegraph",
+            Tab::FlameScope => "FlameScope",
             Tab::TopFunctions => "Top functions",
             Tab::Executables => "Executables",
             Tab::Log => "Log",
@@ -54,6 +67,7 @@ pub trait TabWidget {
     /// Update and draw the tab UI.
     ///
     /// Only invoked by the main app if this tab is active.
+    /// Returns an optional action for the main app to handle.
     fn update(
         &mut self,
         ui: &mut Ui,
@@ -61,7 +75,7 @@ pub trait TabWidget {
         kind: SampleKind,
         start: UtcTimestamp,
         end: UtcTimestamp,
-    );
+    ) -> Option<TabAction>;
 
     /// Whether the main view should show the button that enables this tab.
     fn show_tab_selector(&self, _cfg: &DevfilerConfig) -> bool {
@@ -80,6 +94,9 @@ pub use trace_freq::*;
 
 mod flamegraph;
 pub use flamegraph::*;
+
+mod flamescope;
+pub use flamescope::*;
 
 mod dbstats;
 pub use dbstats::*;
