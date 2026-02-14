@@ -18,7 +18,7 @@
 use crate::storage::{FrameKind, InterpKind};
 use eframe::emath::{Pos2, Rect, Vec2};
 use eframe::epaint::{Color32, Stroke};
-use egui::{Button, TextEdit, Ui};
+use egui::{Align2, Button, FontId, TextEdit, Ui};
 use egui_phosphor::regular as icons;
 use std::fmt;
 
@@ -26,6 +26,44 @@ use std::fmt;
 pub fn clearable_line_edit(ui: &mut Ui, hint: &str, input: &mut String) {
     let elem = TextEdit::singleline(input).hint_text(hint);
     let edit_rect = ui.add(elem).rect;
+
+    if !input.is_empty() {
+        let mut clear_origin = edit_rect.right_center();
+        clear_origin.x -= 10.0;
+
+        let clear_rect = Rect::from_center_size(clear_origin, Vec2::splat(15.0));
+        let clear_widget = Button::new(icons::X).small().frame(false);
+
+        let clear_resp = ui.put(clear_rect, clear_widget);
+
+        if clear_resp.clicked() {
+            input.clear();
+        }
+    }
+}
+
+/// Draw a line edit with a button for clearing it and optional right-aligned text.
+pub fn clearable_line_edit_with_status(
+    ui: &mut Ui,
+    hint: &str,
+    input: &mut String,
+    status_text: Option<(&str, Color32)>,
+) {
+    let elem = TextEdit::singleline(input).hint_text(hint);
+    let edit_rect = ui.add(elem).rect;
+
+    if let Some((text, color)) = status_text {
+        let mut status_pos = edit_rect.right_center();
+        status_pos.x -= if input.is_empty() { 10.0 } else { 30.0 };
+
+        ui.painter().text(
+            status_pos,
+            Align2::RIGHT_CENTER,
+            text,
+            FontId::proportional(12.0),
+            color,
+        );
+    }
 
     if !input.is_empty() {
         let mut clear_origin = edit_rect.right_center();
