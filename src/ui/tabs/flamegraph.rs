@@ -18,7 +18,7 @@
 use super::*;
 use crate::storage::*;
 use crate::ui::cached::Cached;
-use crate::ui::util::{clearable_line_edit, frame_kind_color, humanize_count};
+use crate::ui::util::{clearable_line_edit_with_status, frame_kind_color, humanize_count};
 use base64::Engine;
 use egui::emath::RectTransform;
 use egui::Stroke;
@@ -92,13 +92,47 @@ impl TabWidget for FlameGraphTab {
             });
             ui[1].with_layout(Layout::right_to_left(Align::Min), |ui| {
                 let hint = format!("{} Filter ...", icons::FUNNEL);
-                clearable_line_edit(ui, &hint, &mut self.widget.filter);
+                let prev_filter = self.widget.filter.clone();
+
+                let status_text = if self.widget.filter.len() >= 3 {
+                    if self.widget.match_count > 0 {
+                        let current = self.widget.current_match_index + 1;
+                        Some((
+                            format!("{}/{}", current, self.widget.match_count),
+                            Color32::from_rgb(100, 200, 100),
+                        ))
+                    } else {
+                        Some(("No matches".to_string(), Color32::from_rgb(200, 100, 100)))
+                    }
+                } else {
+                    None
+                };
+
+                clearable_line_edit_with_status(
+                    ui,
+                    &hint,
+                    &mut self.widget.filter,
+                    status_text
+                        .as_ref()
+                        .map(|(text, color)| (text.as_str(), *color)),
+                );
+
+                if prev_filter != self.widget.filter {
+                    self.widget.current_match_index = 0;
+                }
             });
         });
         ui.add_space(5.0);
 
         self.widget.draw(ui, cfg, &*root)
     }
+}
+
+/// MatchingFrame is a helper struct to navigate filtered frames.
+struct MatchingFrame {
+    id: FrameId,
+    pos: Pos2,
+    width_ratio: f32,
 }
 
 /// Widget drawing a flame-graph.
@@ -110,6 +144,12 @@ struct FlameGraphWidget {
     x_zoom: f32,
     filter: String,
     sandwich_view: Option<SandwichView>,
+
+    matching_frames: Vec<MatchingFrame>,
+    current_match_index: usize,
+    match_count: usize,
+    cached_filter: String,
+    rebuild_matches: bool,
 }
 
 /// Sandwich view showing callers above and callees below a selected frame
@@ -128,6 +168,11 @@ impl Default for FlameGraphWidget {
             x_zoom: 1.0,
             filter: "".to_string(),
             sandwich_view: None,
+            matching_frames: Vec::new(),
+            current_match_index: 0,
+            match_count: 0,
+            cached_filter: "".to_string(),
+            rebuild_matches: true,
         }
     }
 }
@@ -139,6 +184,13 @@ impl FlameGraphWidget {
             let (response, painter) = ui.allocate_painter(size, Sense::click_and_drag());
 
             self.process_inputs(ui, size, &response, root);
+
+            if self.filter != self.cached_filter {
+                self.matching_frames.clear();
+                self.match_count = 0;
+                self.cached_filter = self.filter.clone();
+                self.rebuild_matches = true;
+            }
 
             let to_screen = RectTransform::from_to(
                 Rect::from_min_size(self.origin, response.rect.size()),
@@ -180,6 +232,8 @@ impl FlameGraphWidget {
                     root,
                 );
             }
+
+            self.rebuild_matches = false;
         });
     }
 
@@ -353,9 +407,34 @@ impl FlameGraphWidget {
         _root: &FlameGraphNode,
     ) {
         let Some(cursor) = response.hover_pos() else {
-            // Ignore inputs when not hovered.
+            // Check for Enter key even when not hovered (for filter navigation)
+            if ui.input(|i| i.key_pressed(Key::Enter))
+                && self.filter.len() >= 3
+                && !self.matching_frames.is_empty()
+            {
+                let shift_held = ui.input(|i| i.modifiers.shift);
+                if shift_held {
+                    self.navigate_to_prev_match(size);
+                } else {
+                    self.navigate_to_next_match(size);
+                }
+            }
             return;
         };
+
+        // Handle Enter key for navigating through matches
+        if ui.input(|i| i.key_pressed(Key::Enter))
+            && self.filter.len() >= 3
+            && !self.matching_frames.is_empty()
+        {
+            let shift_held = ui.input(|i| i.modifiers.shift);
+            if shift_held {
+                self.navigate_to_prev_match(size);
+            } else {
+                self.navigate_to_next_match(size);
+            }
+            return;
+        }
 
         // Double-click -> reset the view.
         if response.double_clicked() {
@@ -430,11 +509,48 @@ impl FlameGraphWidget {
             return flame_width;
         }
 
-        let bg_color = if flame.text.contains(&self.filter) {
-            flame.bg_color
+        let bg_color = if self.filter.len() >= 3 {
+            if flame.text.contains(&self.filter) {
+                flame.bg_color
+            } else {
+                flame.bg_color.gamma_multiply(0.5)
+            }
         } else {
-            flame.bg_color.gamma_multiply(0.5)
+            flame.bg_color
         };
+
+        // Track matching frames for navigation (only if filter changed)
+        let is_match = self.filter.len() >= 3 && flame.text.contains(&self.filter);
+        let is_focused = if is_match {
+            if self.rebuild_matches {
+                let unscaled_pos = pos2(draw_pos.x / self.x_zoom, draw_pos.y);
+                let width_ratio = flame.weight as f32 / root.weight.max(1) as f32;
+
+                self.matching_frames.push(MatchingFrame {
+                    id: flame.id,
+                    pos: unscaled_pos,
+                    width_ratio,
+                });
+                self.match_count += 1;
+            }
+
+            // Check if this frame is the focused one by comparing IDs
+            self.matching_frames
+                .get(self.current_match_index)
+                .map(|m| m.id == flame.id)
+                .unwrap_or(false)
+        } else {
+            false
+        };
+
+        // Highlight the currently focused match
+        if is_focused {
+            painter.add(Shape::rect_stroke(
+                screen_rect,
+                Rounding::ZERO,
+                Stroke::new(3.0, Color32::from_rgb(255, 215, 0)), // Gold color
+            ));
+        }
 
         painter.add(Shape::rect_filled(screen_rect, Rounding::ZERO, bg_color));
 
@@ -499,6 +615,67 @@ impl FlameGraphWidget {
         }
 
         flame_width
+    }
+
+    /// Navigate to the next matching frame
+    fn navigate_to_next_match(&mut self, size: Vec2) {
+        if self.matching_frames.is_empty() {
+            return;
+        }
+
+        // Cycle to next match
+        self.current_match_index = (self.current_match_index + 1) % self.match_count;
+        self.center_on_current_match(size);
+    }
+
+    /// Navigate to the previous matching frame
+    fn navigate_to_prev_match(&mut self, size: Vec2) {
+        if self.matching_frames.is_empty() {
+            return;
+        }
+
+        // Cycle to previous match (wrap around)
+        if self.current_match_index == 0 {
+            self.current_match_index = self.match_count - 1;
+        } else {
+            self.current_match_index -= 1;
+        }
+        self.center_on_current_match(size);
+    }
+
+    /// Center the view on the currently selected match
+    fn center_on_current_match(&mut self, size: Vec2) {
+        if let Some(frame_info) = self.matching_frames.get(self.current_match_index) {
+            let base_width = size.x * frame_info.width_ratio;
+
+            // Make sure text in frame is readable
+            let min_visible_width = size.x * 0.3;
+            let desired_zoom = if base_width < min_visible_width {
+                (min_visible_width / base_width).min(20.0)
+            } else {
+                1.0
+            };
+
+            // Update zoom
+            self.x_zoom = desired_zoom;
+
+            // Recalculate frame position and center with new zoom
+            let frame_x = frame_info.pos.x * self.x_zoom;
+            let frame_width_zoomed = base_width * self.x_zoom;
+            let frame_center_x = frame_x + frame_width_zoomed / 2.0;
+            let frame_center_y = frame_info.pos.y + FLAME_HEIGHT / 2.0;
+
+            let target_x = frame_center_x - size.x / 2.0;
+            let target_y = frame_center_y - size.y / 2.0;
+
+            self.origin.x = target_x.max(0.0);
+            self.origin.y = target_y.max(0.0);
+
+            // Clamp to visible region
+            let virt_width = size.x * self.x_zoom;
+            self.origin.x = self.origin.x.clamp(0.0, (virt_width - size.x).max(0.0));
+            self.origin.y = self.origin.y.clamp(0.0, MAX_FRAMES * FLAME_HEIGHT);
+        }
     }
 
     /// Populates the on-hover tooltip UI.
