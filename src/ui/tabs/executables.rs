@@ -66,11 +66,12 @@ impl TabWidget for ExecutablesTab {
         _kind: SampleKind,
         _start: UtcTimestamp,
         _end: UtcTimestamp,
-    ) {
+    ) -> Option<TabAction> {
         self.handle_executable_drops(ui.ctx());
         self.draw_sym_status_bar(ui);
         self.draw_symbol_ingest_area(ui);
         self.last_exe_count = self.draw_executable_table(ui);
+        None
     }
 }
 

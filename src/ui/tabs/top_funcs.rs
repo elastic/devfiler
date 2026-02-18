@@ -55,7 +55,7 @@ impl TabWidget for TopFuncsTab {
         _kind: SampleKind,
         start: UtcTimestamp,
         end: UtcTimestamp,
-    ) {
+    ) -> Option<TabAction> {
         let sort_field = self.sort_field;
         let filter = self.filter.clone();
 
@@ -174,6 +174,7 @@ impl TabWidget for TopFuncsTab {
                     });
                 }
             });
+        None
     }
 }
 

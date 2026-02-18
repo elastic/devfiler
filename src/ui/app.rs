@@ -43,6 +43,7 @@ pub struct DevfilerUi {
     md_cache: CommonMarkCache,
     auto_scroll_time: Option<Duration>,
     kind: SampleKind,
+    requested_time_range: Option<(UtcTimestamp, UtcTimestamp)>,
 }
 
 impl eframe::App for DevfilerUi {
@@ -61,6 +62,7 @@ impl DevfilerUi {
             active_tab: Tab::FlameGraph,
             tabs: vec![
                 Box::new(tabs::FlameGraphTab::default()),
+                Box::new(tabs::FlameScopeTab::default()),
                 Box::new(tabs::TopFuncsTab::default()),
                 Box::new(tabs::ExecutablesTab::default()),
                 Box::new(tabs::LogTab::default()),
@@ -81,6 +83,7 @@ impl DevfilerUi {
             md_cache: CommonMarkCache::default(),
             auto_scroll_time: Some(Duration::try_minutes(15).unwrap()),
             kind: SampleKind::Mixed,
+            requested_time_range: None,
         }
     }
 
@@ -114,7 +117,19 @@ impl DevfilerUi {
 
             if let Some(active_tab) = self.tabs.iter_mut().find(|t| t.id() == self.active_tab) {
                 ui.push_id(active_tab.id(), |ui| {
-                    active_tab.update(ui, &self.cfg, self.kind, data_start, data_end);
+                    let action = active_tab.update(ui, &self.cfg, self.kind, data_start, data_end);
+
+                    // Handle any tab action returned
+                    if let Some(tabs::TabAction::SwitchTabWithTimeRange { tab, start, end }) =
+                        action
+                    {
+                        self.active_tab = tab;
+                        // Disable auto-scroll when switching with a specific time range
+                        self.auto_scroll_time = None;
+                        // Set the requested time range for the next frame
+                        self.requested_time_range = Some((start, end));
+                        ctx.request_repaint();
+                    }
                 });
             }
         });
@@ -172,7 +187,17 @@ impl DevfilerUi {
         let response = plot.show(ui, |pui| {
             let data_start;
             let data_end;
-            if let Some(new_lookback) = self.auto_scroll_time {
+
+            // If there's a requested time range (from tab action), use it
+            if let Some((req_start, req_end)) = self.requested_time_range.take() {
+                data_start = req_start;
+                data_end = req_end;
+
+                pui.set_plot_bounds(PlotBounds::from_min_max(
+                    [data_start as f64, -f64::MIN],
+                    [data_end as f64, f64::MAX],
+                ));
+            } else if let Some(new_lookback) = self.auto_scroll_time {
                 let now = chrono::Utc::now();
 
                 data_start = (now - new_lookback).timestamp() as UtcTimestamp;

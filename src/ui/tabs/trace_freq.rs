@@ -46,7 +46,7 @@ impl TabWidget for TraceFreqTab {
         _kind: SampleKind,
         start: UtcTimestamp,
         end: UtcTimestamp,
-    ) {
+    ) -> Option<TabAction> {
         ScrollArea::vertical().show(ui, |ui| {
             ui.collapsing("Deduplication rates", |ui| {
                 if !ui.is_visible() {
@@ -77,6 +77,7 @@ impl TabWidget for TraceFreqTab {
                 self.draw_per_event_freq(ui, start, end);
             });
         });
+        None
     }
 
     fn show_tab_selector(&self, cfg: &DevfilerConfig) -> bool {

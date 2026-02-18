@@ -35,7 +35,7 @@ impl TabWidget for LogTab {
         _kind: SampleKind,
         _start: UtcTimestamp,
         _end: UtcTimestamp,
-    ) {
+    ) -> Option<TabAction> {
         let table = TableBuilder::new(ui)
             .striped(true)
             .resizable(true)
@@ -73,6 +73,7 @@ impl TabWidget for LogTab {
                     });
                 })
             });
+        None
     }
 
     fn show_tab_selector(&self, _cfg: &DevfilerConfig) -> bool {
