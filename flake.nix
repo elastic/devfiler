@@ -153,7 +153,12 @@
                 RUSTFLAGS = toString [
                   # Mold speeds up the build by a few seconds.
                   # It doesn't support macOS: only use it on Linux.
-                  (lib.optional isLinux "-Clink-arg=--ld-path=${pkgs.mold-wrapped}/bin/mold")
+                  # Use clang as the linker driver so --ld-path is recognized
+                  # (older GCC doesn't support that flag).
+                  (lib.optionals isLinux [
+                    "-Clinker=${llvm.clang}/bin/clang"
+                    "-Clink-arg=--ld-path=${pkgs.mold}/bin/mold"
+                  ])
 
                   # On Darwin, librocksdb-sys links C++ libraries in some weird
                   # way that doesn't work with `buildInputs`. Link it manually ...
