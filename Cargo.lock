@@ -1278,9 +1278,9 @@ checksum = "07e28edb80900c19c28f1072f2e8aeca7fa06b23cd4169cefe1af5aa3260783f"
 
 [[package]]
 name = "gimli"
-version = "0.32.2"
+version = "0.33.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc6298e594375a7fead9efd5568f0a46e6a154fb6a9bdcbe3c06946ffd81a5f6"
+checksum = "0bf7f043f89559805f8c7cacc432749b2fa0d0a0a9ee46ce47164ed5ba7f126c"
 dependencies = [
  "fallible-iterator",
  "stable_deref_trait",
@@ -3596,7 +3596,7 @@ dependencies = [
  "cpp_demangle",
  "fallible-iterator",
  "flate2",
- "gimli 0.32.2",
+ "gimli 0.33.0",
  "intervaltree",
  "lru 0.16.0",
  "memmap2",

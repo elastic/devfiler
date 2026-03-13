@@ -4,11 +4,13 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
     flake-utils.url = "github:numtide/flake-utils";
+    rust-overlay.url = "github:oxalica/rust-overlay";
+    rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
     crane.url = "github:ipetkov/crane";
     crane.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { crane, flake-utils, nixpkgs, ... }:
+  outputs = { crane, flake-utils, nixpkgs, rust-overlay, ... }:
     flake-utils.lib.eachSystem [
       "aarch64-linux"
       "x86_64-linux"
@@ -17,13 +19,19 @@
     ]
       (system:
         let
-          pkgs = import nixpkgs { inherit system; };
+          pkgs = import nixpkgs {
+            inherit system;
+            overlays = [ rust-overlay.overlays.default ];
+          };
           llvm = pkgs.llvmPackages_16;
           stdenv = llvm.stdenv;
           lib = pkgs.lib;
           isLinux = stdenv.isLinux;
           isDarwin = stdenv.isDarwin;
-          craneLib = (crane.mkLib pkgs);
+
+          # Use Rust toolchain from rust-toolchain.toml (matches Cargo.toml rust-version)
+          rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
+          craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
 
           # Filter source tree to avoid unnecessary rebuilds.
           includedSuffixes = [
@@ -145,7 +153,12 @@
                 RUSTFLAGS = toString [
                   # Mold speeds up the build by a few seconds.
                   # It doesn't support macOS: only use it on Linux.
-                  (lib.optional isLinux "-Clink-arg=--ld-path=${pkgs.mold-wrapped}/bin/mold")
+                  # Use clang as the linker driver so --ld-path is recognized
+                  # (older GCC doesn't support that flag).
+                  (lib.optionals isLinux [
+                    "-Clinker=${llvm.clang}/bin/clang"
+                    "-Clink-arg=--ld-path=${pkgs.mold}/bin/mold"
+                  ])
 
                   # On Darwin, librocksdb-sys links C++ libraries in some weird
                   # way that doesn't work with `buildInputs`. Link it manually ...
