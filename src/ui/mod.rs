@@ -77,7 +77,9 @@ async fn background_ui_waker(ctx: egui::Context) {
 fn load_phosphor_icons(ctx: &egui::Context) {
     let mut fonts = egui::FontDefinitions::default();
     let data = egui_phosphor::Variant::Regular.font_data();
-    fonts.font_data.insert("phosphor".into(), std::sync::Arc::new(data));
+    fonts
+        .font_data
+        .insert("phosphor".into(), std::sync::Arc::new(data));
     for family in [egui::FontFamily::Proportional, egui::FontFamily::Monospace] {
         if let Some(font_keys) = fonts.families.get_mut(&family) {
             font_keys.push("phosphor".into());

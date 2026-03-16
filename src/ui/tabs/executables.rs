@@ -196,7 +196,12 @@ impl ExecutablesTab {
             let rect = trans.transform_rect(Rect::from_min_size(pos, size));
 
             painter.rect_filled(rect, CornerRadius::ZERO, color.gamma_multiply(0.8));
-            painter.rect_stroke(rect, CornerRadius::ZERO, Stroke::new(1.0, Color32::BLACK), StrokeKind::Middle);
+            painter.rect_stroke(
+                rect,
+                CornerRadius::ZERO,
+                Stroke::new(1.0, Color32::BLACK),
+                StrokeKind::Middle,
+            );
 
             if matches!(response.hover_pos(), Some(p) if rect.contains(p)) {
                 let tooltip_id = Id::new("executable-bar-tooltip");

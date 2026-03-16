@@ -23,8 +23,8 @@ use base64::Engine;
 use egui::emath::RectTransform;
 use egui::Stroke;
 use egui::{
-    pos2, vec2, Align, Align2, Color32, CornerRadius, FontId, Id, Key, Label, Layout,
-    Painter, PopupAnchor, Pos2, Rangef, Rect, Response, Sense, Shape, StrokeKind, Tooltip, Vec2,
+    pos2, vec2, Align, Align2, Color32, CornerRadius, FontId, Id, Key, Label, Layout, Painter,
+    PopupAnchor, Pos2, Rangef, Rect, Response, Sense, Shape, StrokeKind, Tooltip, Vec2,
 };
 use egui_phosphor::regular as icons;
 use std::collections::HashMap;
@@ -556,7 +556,11 @@ impl FlameGraphWidget {
             ));
         }
 
-        painter.add(Shape::rect_filled(screen_rect, CornerRadius::ZERO, bg_color));
+        painter.add(Shape::rect_filled(
+            screen_rect,
+            CornerRadius::ZERO,
+            bg_color,
+        ));
 
         painter.add(Shape::rect_stroke(
             screen_rect,

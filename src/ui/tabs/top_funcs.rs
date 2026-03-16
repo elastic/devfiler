@@ -208,7 +208,13 @@ fn draw_frame_type_square(ui: &mut Ui, kind: FrameKind) {
     let size = [10.0, 10.0].into();
     let (rect, _) = ui.allocate_exact_size(size, Sense::hover());
     let painter = ui.painter_at(rect);
-    painter.rect(rect, 0.0, color, Stroke::new(1.0, stroke_color), StrokeKind::Middle);
+    painter.rect(
+        rect,
+        0.0,
+        color,
+        Stroke::new(1.0, stroke_color),
+        StrokeKind::Middle,
+    );
 }
 
 /// Draw a heatmap visualizing when within the filter period the function was invoked.

@@ -154,7 +154,13 @@ where
 
     let painter = ui.painter_at(rect);
     let bg_stroke = ui.visuals().widgets.noninteractive.bg_stroke;
-    painter.rect(rect, 0.0, ui.visuals().extreme_bg_color, bg_stroke, StrokeKind::Middle);
+    painter.rect(
+        rect,
+        0.0,
+        ui.visuals().extreme_bg_color,
+        bg_stroke,
+        StrokeKind::Middle,
+    );
     rect = rect.shrink(bg_stroke.width);
 
     let tile_size = Vec2::new(rect.width() / columns as f32, rect.height() / rows as f32);
