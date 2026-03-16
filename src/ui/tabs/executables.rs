@@ -21,8 +21,8 @@ use crate::symbolizer::IngestTask;
 use crate::ui::util::{clearable_line_edit, humanize_count};
 use egui::emath::RectTransform;
 use egui::{
-    show_tooltip_at_pointer, Align, Color32, Direction, Id, Layout, Pos2, Rect, Rounding, Sense,
-    Stroke, Vec2,
+    Align, Color32, CornerRadius, Direction, Id, Layout, PopupAnchor, Pos2, Rect, Sense, Stroke,
+    StrokeKind, Tooltip, Vec2,
 };
 use egui_extras::{Column, TableBuilder};
 use egui_phosphor::regular as icons;
@@ -195,19 +195,20 @@ impl ExecutablesTab {
             let size = Vec2::new(width, SYMB_STATUS_BAR_HEIGHT);
             let rect = trans.transform_rect(Rect::from_min_size(pos, size));
 
-            painter.rect_filled(rect, Rounding::ZERO, color.gamma_multiply(0.8));
-            painter.rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, Color32::BLACK));
+            painter.rect_filled(rect, CornerRadius::ZERO, color.gamma_multiply(0.8));
+            painter.rect_stroke(rect, CornerRadius::ZERO, Stroke::new(1.0, Color32::BLACK), StrokeKind::Middle);
 
             if matches!(response.hover_pos(), Some(p) if rect.contains(p)) {
                 let tooltip_id = Id::new("executable-bar-tooltip");
-                show_tooltip_at_pointer(
-                    ui.ctx(),
+                Tooltip::always_open(
+                    ui.ctx().clone(),
                     egui::LayerId::new(egui::Order::Tooltip, tooltip_id),
                     tooltip_id,
-                    |ui: &mut Ui| {
-                        ui.label(format!("{}: {:.0}", name, humanize_count(value)));
-                    },
-                );
+                    PopupAnchor::Pointer,
+                )
+                .show(|ui: &mut Ui| {
+                    ui.label(format!("{}: {:.0}", name, humanize_count(value)));
+                });
             }
 
             offset += width;
@@ -215,8 +216,9 @@ impl ExecutablesTab {
 
         painter.rect_stroke(
             response.rect,
-            Rounding::same(1.0),
+            CornerRadius::same(1),
             style.visuals.widgets.noninteractive.bg_stroke,
+            StrokeKind::Middle,
         );
     }
 

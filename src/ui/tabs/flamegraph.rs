@@ -23,8 +23,8 @@ use base64::Engine;
 use egui::emath::RectTransform;
 use egui::Stroke;
 use egui::{
-    pos2, show_tooltip_at_pointer, vec2, Align, Align2, Color32, FontId, Id, Key, Label, Layout,
-    Painter, Pos2, Rangef, Rect, Response, Rounding, Sense, Shape, Vec2,
+    pos2, vec2, Align, Align2, Color32, CornerRadius, FontId, Id, Key, Label, Layout,
+    Painter, PopupAnchor, Pos2, Rangef, Rect, Response, Sense, Shape, StrokeKind, Tooltip, Vec2,
 };
 use egui_phosphor::regular as icons;
 use std::collections::HashMap;
@@ -263,13 +263,14 @@ impl FlameGraphWidget {
         let screen_rect = to_screen.transform_rect(selected_rect);
         painter.add(Shape::rect_filled(
             screen_rect,
-            Rounding::ZERO,
+            CornerRadius::ZERO,
             Color32::YELLOW,
         ));
         painter.add(Shape::rect_stroke(
             screen_rect,
-            Rounding::ZERO,
+            CornerRadius::ZERO,
             Stroke::new(2.0, Color32::BLACK),
+            StrokeKind::Middle,
         ));
         painter.text(
             to_screen * selected_rect.min + vec2(4.0, 4.0),
@@ -308,13 +309,14 @@ impl FlameGraphWidget {
             let screen_rect = to_screen.transform_rect(rect);
             painter.add(Shape::rect_filled(
                 screen_rect,
-                Rounding::ZERO,
+                CornerRadius::ZERO,
                 node.bg_color,
             ));
             painter.add(Shape::rect_stroke(
                 screen_rect,
-                Rounding::ZERO,
+                CornerRadius::ZERO,
                 Stroke::new(0.5, Color32::BLACK),
+                StrokeKind::Middle,
             ));
 
             if width > MIN_TEXT_WIDTH {
@@ -548,17 +550,19 @@ impl FlameGraphWidget {
         if is_focused {
             painter.add(Shape::rect_stroke(
                 screen_rect,
-                Rounding::ZERO,
+                CornerRadius::ZERO,
                 Stroke::new(3.0, Color32::from_rgb(255, 215, 0)), // Gold color
+                StrokeKind::Middle,
             ));
         }
 
-        painter.add(Shape::rect_filled(screen_rect, Rounding::ZERO, bg_color));
+        painter.add(Shape::rect_filled(screen_rect, CornerRadius::ZERO, bg_color));
 
         painter.add(Shape::rect_stroke(
             screen_rect,
-            Rounding::ZERO,
+            CornerRadius::ZERO,
             Stroke::new(0.5, Color32::BLACK),
+            StrokeKind::Middle,
         ));
 
         if flame_width > MIN_TEXT_WIDTH {
@@ -574,12 +578,13 @@ impl FlameGraphWidget {
         if let Some(hover_pos) = cursor_hover_pos {
             if screen_rect.contains(hover_pos) {
                 let id = Id::new("flamegraph-tooltip");
-                show_tooltip_at_pointer(
-                    ctx,
+                Tooltip::always_open(
+                    ctx.clone(),
                     egui::LayerId::new(egui::Order::Tooltip, id),
                     id,
-                    |ui: &mut Ui| self.draw_tooltip(ui, cfg, root, flame),
-                );
+                    PopupAnchor::Pointer,
+                )
+                .show(|ui: &mut Ui| self.draw_tooltip(ui, cfg, root, flame));
 
                 if clicked && flame.weight >= 1 {
                     if ctrl_held {

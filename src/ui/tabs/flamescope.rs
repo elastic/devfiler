@@ -207,7 +207,7 @@ fn draw_heatmap(
                 [x, y + cell_height],
             ];
 
-            let polygon = Polygon::new(points)
+            let polygon = Polygon::new("", points)
                 .fill_color(color)
                 .stroke(egui::Stroke::NONE);
 
@@ -227,7 +227,7 @@ fn draw_heatmap(
                 [sel_start, MS_PER_SECOND as f64],
             ];
 
-            let overlay = Polygon::new(points)
+            let overlay = Polygon::new("", points)
                 .fill_color(Color32::from_rgba_unmultiplied(255, 255, 0, 50))
                 .stroke(egui::Stroke::new(2.0, Color32::YELLOW));
 
