@@ -58,7 +58,7 @@ serde = { version = "1.0.193", features = ["derive"] }
 serde_json = "1.0.108"
 tikv-jemallocator = "0.5.4"
 tokio = { version = "1.32.0", features = ["macros", "rt-multi-thread"] }
-tonic = { version = "0.11.0", features = ["gzip"] }
+tonic = { version = "0.14.0", features = ["gzip"] }
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 zstd = "0.13.0"
@@ -83,7 +83,7 @@ features = ["default_fonts", "x11"]
 objc2 = { version = "0.5.2", features = ["relax-sign-encoding"] }
 
 [build-dependencies]
-tonic-build = "0.11.0"
+tonic-build = "0.14.0"
 
 [dev-dependencies]
 tempfile = "3.0"
