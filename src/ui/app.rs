@@ -24,7 +24,7 @@ use crate::ui::tabs::{Tab, TabWidget};
 use chrono::Duration;
 use eframe::egui::{Align, Layout};
 use eframe::{egui, egui::Ui};
-use egui::{Image, Label, Pos2, Rect, RichText, SelectableLabel, Sense, Vec2, Widget};
+use egui::{Button, Image, Label, Pos2, Rect, RichText, Sense, Vec2, Widget};
 use egui_commonmark::{CommonMarkCache, CommonMarkViewer};
 use egui_plot::{Axis, AxisHints, Line, Plot, PlotBounds};
 
@@ -224,8 +224,8 @@ impl DevfilerUi {
                             .collect()
                     });
 
-            pui.line(Line::new(points.clone()));
-            pui.set_auto_bounds([false, true].into());
+            pui.line(Line::new("", points.clone()));
+            pui.set_auto_bounds(egui::Vec2b::new(false, true));
 
             (data_start as UtcTimestamp, data_end as UtcTimestamp)
         });
@@ -269,8 +269,7 @@ impl DevfilerUi {
                 ("24h", Duration::try_days(1).unwrap()),
             ] {
                 let is_active = self.auto_scroll_time == Some(duration);
-                let label = SelectableLabel::new(is_active, text);
-                let response = label.ui(ui);
+                let response = Button::selectable(is_active, text).ui(ui);
                 if response.clicked() {
                     if is_active {
                         self.auto_scroll_time = None;

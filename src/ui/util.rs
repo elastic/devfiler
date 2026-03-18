@@ -16,8 +16,8 @@
 // under the License.
 
 use crate::storage::{FrameKind, InterpKind};
-use eframe::emath::{Pos2, Rect, Vec2};
-use eframe::epaint::{Color32, Stroke};
+use eframe::emath::{GuiRounding as _, Pos2, Rect, Vec2};
+use eframe::epaint::{Color32, Stroke, StrokeKind};
 use egui::{Align2, Button, FontId, TextEdit, Ui};
 use egui_phosphor::regular as icons;
 use std::fmt;
@@ -154,7 +154,13 @@ where
 
     let painter = ui.painter_at(rect);
     let bg_stroke = ui.visuals().widgets.noninteractive.bg_stroke;
-    painter.rect(rect, 0.0, ui.visuals().extreme_bg_color, bg_stroke);
+    painter.rect(
+        rect,
+        0.0,
+        ui.visuals().extreme_bg_color,
+        bg_stroke,
+        StrokeKind::Middle,
+    );
     rect = rect.shrink(bg_stroke.width);
 
     let tile_size = Vec2::new(rect.width() / columns as f32, rect.height() / rows as f32);
@@ -170,12 +176,13 @@ where
                 rect.min.y + tile_size.y * row_idx as f32,
             );
 
+            let ppp = painter.pixels_per_point();
             let tile = Rect::from_min_max(
-                painter.round_pos_to_pixels(min),
-                painter.round_pos_to_pixels(min + tile_size),
+                min.round_to_pixels(ppp),
+                (min + tile_size).round_to_pixels(ppp),
             );
 
-            painter.rect(tile, 0.0, color, Stroke::NONE);
+            painter.rect(tile, 0.0, color, Stroke::NONE, StrokeKind::Middle);
         }
     }
 }

@@ -21,7 +21,7 @@ use crate::ui::cached::Cached;
 use crate::ui::util::{
     clearable_line_edit, draw_heat_map, frame_kind_color, humanize_count, plot_color,
 };
-use egui::{Align, Color32, Layout, Sense, Stroke};
+use egui::{Align, Color32, Layout, Sense, Stroke, StrokeKind};
 use egui_extras::{Column, TableBuilder};
 use egui_phosphor::regular as icons;
 use nohash_hasher::IntSet;
@@ -193,7 +193,7 @@ fn draw_percent_column(ui: &mut Ui, perc: f32) {
         rect.set_width(rect.width() * perc);
         let painter = ui.painter_at(rect);
         let color = ui.visuals().selection.bg_fill;
-        painter.rect(rect, 0.0, color, Stroke::NONE);
+        painter.rect(rect, 0.0, color, Stroke::NONE, StrokeKind::Middle);
     }
 
     let text = format!("{:.02}%", perc * 100.0);
@@ -208,7 +208,13 @@ fn draw_frame_type_square(ui: &mut Ui, kind: FrameKind) {
     let size = [10.0, 10.0].into();
     let (rect, _) = ui.allocate_exact_size(size, Sense::hover());
     let painter = ui.painter_at(rect);
-    painter.rect(rect, 0.0, color, Stroke::new(1.0, stroke_color));
+    painter.rect(
+        rect,
+        0.0,
+        color,
+        Stroke::new(1.0, stroke_color),
+        StrokeKind::Middle,
+    );
 }
 
 /// Draw a heatmap visualizing when within the filter period the function was invoked.

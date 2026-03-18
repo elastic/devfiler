@@ -104,7 +104,7 @@ impl TraceFreqTab {
                 )
             })
             .show(ui, |pui| {
-                pui.bar_chart(BarChart::new(bars.clone()));
+                pui.bar_chart(BarChart::new("", bars.clone()));
                 pui.plot_bounds()
             });
     }
