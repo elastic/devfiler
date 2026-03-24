@@ -3,7 +3,7 @@ devfiler
 
 devfiler reimplements the whole collection, data storage, symbolization, and UI portion of
 [OTel eBPF Profiler] in a desktop application. This essentially allows developers to start
-using the profiling agent in a matter of seconds without having to spin up a whole Elastic 
+using the profiling agent in a matter of seconds without having to spin up a whole Elastic
 deployment first.
 
 [OTel eBPF Profiler]: https://github.com/open-telemetry/opentelemetry-ebpf-profiler/
@@ -13,12 +13,13 @@ application can profile macOS applications: the [OTel eBPF Profiler] still needs
 machine, but the UI can be used on macOS.
 
 > [!NOTE]
-> 
+>
 > This is currently **not** a supported product. It started out as [@athre0z]'s personal
 > project and was later transferred to the Elastic GitHub account because some people in
 > the team liked the idea of having it to speed up some development workflows and
 > prototyping. We're now releasing it under Apache-2.0 to help with OTLP Profiling
-> development.
+> development, devfiler is **not** a production-ready backend and should **not** be
+> deployed as such.
 
 [@athre0z]: https://github.com/athre0z
 
@@ -30,7 +31,7 @@ machine, but the UI can be used on macOS.
 
 ### Nix
 
-The primary build system is currently the [Nix] package manager. Once Nix is 
+The primary build system is currently the [Nix] package manager. Once Nix is
 installed on the system, devfiler can be built with the following command:
 
 ```
@@ -62,15 +63,15 @@ into `~/.config/nix/nix.conf`.
 
 ### Cargo
 
-Alternatively it's also possible to build devfiler with just plain cargo. This currently doesn't 
-allow generating a proper application bundle for macOS, but it's perfectly sufficient for 
-development and local use. Cargo is typically best installed via [rustup], but using `cargo` and 
+Alternatively it's also possible to build devfiler with just plain cargo. This currently doesn't
+allow generating a proper application bundle for macOS, but it's perfectly sufficient for
+development and local use. Cargo is typically best installed via [rustup], but using `cargo` and
 `rustc` from your distribution repositories might work as well if it is recent enough.
 
 [rustup]: https://rustup.rs/
 
-Additionally, make sure that `g++` (or `clang`), `libclang` and `protoc` are available on 
-the system. The following should do the job for Debian and Ubuntu. The packages should also 
+Additionally, make sure that `g++` (or `clang`), `libclang` and `protoc` are available on
+the system. The following should do the job for Debian and Ubuntu. The packages should also
 be available in the repositories of other distributions and also from MacPorts/Brew, but
 names may vary.
 
@@ -101,7 +102,7 @@ sudo ./ebpf-profiler -collection-agent=127.0.0.1:11000 -disable-tls
 ### Profiling on remote hosts
 
 A common use-case is to ssh into and run the profiling agent on a remote machine. The easiest
-way to set up the connection in this case is with a [ssh reverse tunnel]. Simply run devfiler 
+way to set up the connection in this case is with a [ssh reverse tunnel]. Simply run devfiler
 locally and then connect to your remote machine like this:
 
 ```
