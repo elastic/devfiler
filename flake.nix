@@ -177,8 +177,13 @@
                   $out/share/icons/hicolor/512x512/apps/devfiler.png
               '';
               postInstall = lib.optionalString isLinux ''
-                patchelf --shrink-rpath $out/bin/devfiler
-                patchelf --add-rpath ${linuxDynamicLibs} $out/bin/devfiler
+                # Nix's glibc ignores /etc/ld.so.conf; use the system linker
+                # so that Mesa and other distro libs are found normally.
+                # Only OpenSSL stays pinned via RUNPATH:
+                patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 \
+                  $out/bin/devfiler
+                patchelf --remove-rpath $out/bin/devfiler
+                patchelf --add-rpath ${pkgs.openssl.out}/lib $out/bin/devfiler
               '';
 
               # On macOS, ship the required C++ runtime libs as part of
